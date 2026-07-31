@@ -11,9 +11,12 @@ const serverEnvSchema = z.object({
   COMPOSIO_API_KEY: z.string().min(1).optional(),
   SENSO_API_KEY: z.string().min(1).optional(),
   LINQ_API_TOKEN: z.string().min(1).optional(),
+  LINQ_PHONE_NUMBER: z.string().regex(/^\+[1-9]\d{7,14}$/).optional(),
+  COMPOSIO_USER_ID: z.string().min(1).optional(),
   GOOGLE_CLOUD_PROJECT: z.string().min(1).optional(),
   GOOGLE_CLOUD_LOCATION: z.string().min(1).default("us-central1"),
   GEMINI_MODEL: z.string().min(1).optional(),
+  GEMINI_API_KEY: z.string().min(1).optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

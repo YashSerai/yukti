@@ -5,6 +5,8 @@ import { seedAudit, seedCandidates, seedEvents } from "../lib/seed";
 
 type View = "Today" | "People" | "Wallet" | "Audit";
 type SandboxSession = { transactionId: string; checkoutUrl: string; expiresAt: string };
+type PreparationBrief = { summary: string; candidateReasons: Array<{ candidateId: string; reason: string }>; caution: string; model: string };
+type ProviderStatus = { checkedAt: string; providers: Record<string, { state: string; detail?: string; model?: string }> };
 
 const money = (amount: number, currency: string) => new Intl.NumberFormat("en-CA", { style: "currency", currency }).format(amount / 100);
 
@@ -20,11 +22,41 @@ export function YuktiDemo() {
   const [sandboxSession, setSandboxSession] = useState<SandboxSession | null>(null);
   const [paymentBusy, setPaymentBusy] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [brief, setBrief] = useState<PreparationBrief | null>(null);
+  const [briefBusy, setBriefBusy] = useState(false);
+  const [briefError, setBriefError] = useState<string | null>(null);
+  const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
+  const [statusBusy, setStatusBusy] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
   const candidate = seedCandidates.find((item) => item.id === selectedCandidate) ?? seedCandidates[0];
 
   const reset = () => {
     if (sandboxSession) return;
-    setView("Today"); setSelectedEvent(seedEvents[0].id); setSelectedCandidate(seedCandidates[0].id); setReviewing(false); setApproved(false); setApprovalId(null); setApprovalError(null); setPaymentError(null);
+    setView("Today"); setSelectedEvent(seedEvents[0].id); setSelectedCandidate(seedCandidates[0].id); setReviewing(false); setApproved(false); setApprovalId(null); setApprovalError(null); setPaymentError(null); setBrief(null); setBriefError(null);
+  };
+
+  const checkProviders = async () => {
+    setStatusBusy(true); setStatusError(null);
+    try {
+      const response = await fetch("/api/status", { method: "POST" });
+      const result = await response.json() as ProviderStatus;
+      if (!response.ok || !result.providers) throw new Error("status_failed");
+      setProviderStatus(result);
+    } catch {
+      setStatusError("Provider status is unavailable. No external action was attempted.");
+    } finally { setStatusBusy(false); }
+  };
+
+  const prepareWithGemini = async () => {
+    setBriefBusy(true); setBriefError(null);
+    try {
+      const response = await fetch("/api/prepare", { method: "POST" });
+      const result = await response.json() as { brief?: PreparationBrief; error?: string };
+      if (!response.ok || !result.brief) throw new Error(result.error ?? "prepare_failed");
+      setBrief(result.brief);
+    } catch {
+      setBriefError("Gemini could not prepare a brief. The seeded options are still available.");
+    } finally { setBriefBusy(false); }
   };
 
   const startPrava = async () => {
@@ -76,16 +108,16 @@ export function YuktiDemo() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <button className="wordmark" onClick={reset} aria-label="Reset Yukti demo"><span>Y</span> Yukti</button>
+        <button className="wordmark" onClick={reset} disabled={Boolean(sandboxSession)} aria-label="Reset Yukti demo"><span>Y</span> Yukti</button>
         <nav aria-label="Primary navigation">
           {(["Today", "People", "Wallet", "Audit"] as View[]).map((item) => (
             <button key={item} className={view === item ? "nav-active" : ""} onClick={() => setView(item)}>{item}</button>
           ))}
         </nav>
-        <button className="avatar" aria-label="Open profile">YS</button>
+        <span className="avatar" aria-label="Signed in as Yash Serai">YS</span>
       </header>
 
-      <div className="demo-strip"><span>Seeded judge demo</span><p>Recommendations are fixtures. No live purchase has been attempted.</p><button onClick={reset}>Reset</button></div>
+      <div className="demo-strip"><span>Seeded judge demo</span><p>Recommendations are fixtures. No live purchase has been attempted.</p><button onClick={reset} disabled={Boolean(sandboxSession)} title={sandboxSession ? "Cancel the open Prava session before resetting" : undefined}>Reset</button></div>
 
       {view === "Today" ? (
         <section className="today-grid">
@@ -108,14 +140,17 @@ export function YuktiDemo() {
             {selectedEvent === "evt-sarah" ? (
               <>
                 <div className="workspace-head"><div><div className="eyebrow brass">Ready to review</div><h2>Sarah’s birthday, prepared.</h2><p>Two options fit what you remember about Sarah and can arrive before dinner.</p></div><div className="deadline"><small>Decision window</small><strong>2 days</strong><span>for comfortable delivery</span></div></div>
-                <div className="context-line"><span>Known context</span><p>Jasmine tea · ceramics class · prefers useful gifts</p><button onClick={() => setView("People")}>View memory</button></div>
+                <div className="context-line"><span>Known context</span><p>Jasmine tea · ceramics class · prefers useful gifts</p><div className="context-actions"><button onClick={() => setView("People")}>View memory</button><button onClick={prepareWithGemini} disabled={briefBusy}>{briefBusy ? "Gemini is preparing…" : brief ? "Refresh Gemini brief" : "Prepare with Gemini 3.6 Flash"}</button></div></div>
+                {brief && <div className="model-brief"><span>Senso memory → Gemini decision brief</span><p>{brief.summary}</p><small>{brief.caution}</small></div>}
+                {briefError && <p className="inline-error" role="alert">{briefError}</p>}
                 <div className="candidate-grid">
                   {seedCandidates.map((item, index) => (
                     <button key={item.id} disabled={Boolean(sandboxSession)} className={`candidate-card ${selectedCandidate === item.id ? "chosen" : ""}`} onClick={() => { setSelectedCandidate(item.id); setApproved(false); setApprovalId(null); setApprovalError(null); setPaymentError(null); }}>
                       <div className={`object-study study-${index + 1}`} aria-hidden="true"><span /><i /></div>
                       <span className="merchant">{item.merchant}</span><h3>{item.title}</h3><p>{item.reason}</p>
+                      {brief && <p className="model-reason">{brief.candidateReasons.find((reason) => reason.candidateId === item.id)?.reason}</p>}
                       <div className="candidate-meta"><strong>{money(item.price, item.currency)}</strong><span>{item.arrival}</span></div>
-                      <small>{item.evidence}</small>
+                      <small>{brief ? `Senso fixture → ${brief.model}` : item.evidence}</small>
                     </button>
                   ))}
                 </div>
@@ -137,7 +172,7 @@ export function YuktiDemo() {
             )}
           </article>
         </section>
-      ) : <SecondaryView view={view} />}
+      ) : <SecondaryView view={view} providerStatus={providerStatus} statusBusy={statusBusy} statusError={statusError} onCheckProviders={checkProviders} />}
 
       {reviewing && (
         <div className="modal-backdrop" role="presentation" onMouseDown={() => setReviewing(false)}>
@@ -158,11 +193,11 @@ export function YuktiDemo() {
 
 function EmptyEvent({ eventId }: { eventId: string }) {
   const passport = eventId === "evt-passport";
-  return <div className="empty-event"><span className="large-mark">{passport ? "12" : "15"}</span><div className="eyebrow brass">{passport ? "Needs one answer" : "Watching"}</div><h2>{passport ? "Passport renewal needs your travel date." : "Nothing to do yet."}</h2><p>{passport ? "Yukti can prepare the renewal checklist after you confirm whether international travel is booked in the next six months." : "Yukti will surface the dentist follow-up if a form, payment, or calendar decision appears."}</p><button className="secondary">{passport ? "Add travel detail" : "View event"}</button></div>;
+  return <div className="empty-event"><span className="large-mark">{passport ? "12" : "15"}</span><div className="eyebrow brass">{passport ? "Needs one answer" : "Watching"}</div><h2>{passport ? "Passport renewal needs your travel date." : "Nothing to do yet."}</h2><p>{passport ? "Yukti can prepare the renewal checklist after you confirm whether international travel is booked in the next six months." : "Yukti will surface the dentist follow-up if a form, payment, or calendar decision appears."}</p><p className="page-note">{passport ? "Travel detail collection is outside this transaction demo." : "No action is available until the follow-up becomes relevant."}</p></div>;
 }
 
-function SecondaryView({ view }: { view: Exclude<View, "Today"> }) {
-  if (view === "People") return <section className="secondary-page"><div className="eyebrow">People</div><h1>Memory you can inspect.</h1><div className="person-card"><span className="avatar large">S</span><div><h2>Sarah</h2><p>Friend · 3 saved facts · all seeded</p></div><button>Edit memory</button></div><p className="page-note">Jasmine tea · taking a ceramics class · prefers useful gifts</p></section>;
+function SecondaryView({ view, providerStatus, statusBusy, statusError, onCheckProviders }: { view: Exclude<View, "Today">; providerStatus: ProviderStatus | null; statusBusy: boolean; statusError: string | null; onCheckProviders: () => void }) {
+  if (view === "People") return <section className="secondary-page"><div className="eyebrow">People</div><h1>Memory you can inspect.</h1><div className="person-card"><span className="avatar large">S</span><div><h2>Sarah</h2><p>Friend · 3 saved facts · all seeded</p></div><span className="fixture-label">Read-only fixture</span></div><p className="page-note">Jasmine tea · taking a ceramics class · prefers useful gifts</p></section>;
   if (view === "Wallet") return <section className="secondary-page"><div className="eyebrow">Wallet</div><h1>No open transactions.</h1><div className="ledger-zero"><strong>$0.00</strong><span>spent through this seeded demo</span></div><p className="page-note">Yukti creates short-lived, purchase-scoped approval envelopes. A real Prava credential is requested only after approval.</p></section>;
-  return <section className="secondary-page"><div className="eyebrow">Audit</div><h1>Every consequential step, visible.</h1><div className="audit-list">{seedAudit.map((item) => <div key={item.time + item.title}><time>{item.time}</time><span><strong>{item.title}</strong><small>{item.detail}</small></span></div>)}</div></section>;
+  return <section className="secondary-page"><div className="eyebrow">Audit</div><h1>Consequences, recorded.</h1><div className="connection-check"><div><strong>Provider readiness</strong><p>Checks configuration and read-only health. It does not send a message or start a payment.</p></div><button className="secondary" onClick={onCheckProviders} disabled={statusBusy}>{statusBusy ? "Checking…" : "Check connections"}</button></div>{statusError && <p className="inline-error" role="alert">{statusError}</p>}{providerStatus && <div className="provider-grid" aria-live="polite">{Object.entries(providerStatus.providers).map(([name, status]) => <div key={name}><span>{name}</span><strong>{status.state.replaceAll("_", " ")}</strong>{status.detail && <small>{status.detail}</small>}</div>)}</div>}<div className="audit-list">{seedAudit.map((item) => <div key={item.time + item.title}><time>{item.time}</time><span><strong>{item.title}</strong><small>{item.detail}</small></span></div>)}</div></section>;
 }

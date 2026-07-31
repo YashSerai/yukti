@@ -9,6 +9,13 @@ interface Env {
   YUKTI_MODE?: string;
   YUKTI_APP_URL?: string;
   PRAVA_SECRET_KEY?: string;
+  GEMINI_API_KEY?: string;
+  GEMINI_MODEL?: string;
+  SENSO_API_KEY?: string;
+  LINQ_API_TOKEN?: string;
+  LINQ_PHONE_NUMBER?: string;
+  COMPOSIO_API_KEY?: string;
+  COMPOSIO_USER_ID?: string;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {

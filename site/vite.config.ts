@@ -1,6 +1,6 @@
 import vinext from "vinext";
 import { defineConfig } from "vite";
-import hostingConfig from "./.openai/hosting.json";
+import hostingConfig from "./.openai/hosting.json" with { type: "json" };
 import { sites } from "./build/sites-vite-plugin";
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
@@ -18,6 +18,13 @@ const localBindingConfig = {
     YUKTI_MODE: process.env.YUKTI_MODE ?? "seeded",
     ...(process.env.YUKTI_APP_URL ? { YUKTI_APP_URL: process.env.YUKTI_APP_URL } : {}),
     ...(process.env.PRAVA_SECRET_KEY ? { PRAVA_SECRET_KEY: process.env.PRAVA_SECRET_KEY } : {}),
+    ...(process.env.GEMINI_API_KEY ? { GEMINI_API_KEY: process.env.GEMINI_API_KEY } : {}),
+    ...(process.env.SENSO_API_KEY ? { SENSO_API_KEY: process.env.SENSO_API_KEY } : {}),
+    ...(process.env.LINQ_API_TOKEN ? { LINQ_API_TOKEN: process.env.LINQ_API_TOKEN } : {}),
+    ...(process.env.LINQ_PHONE_NUMBER ? { LINQ_PHONE_NUMBER: process.env.LINQ_PHONE_NUMBER } : {}),
+    ...(process.env.COMPOSIO_API_KEY ? { COMPOSIO_API_KEY: process.env.COMPOSIO_API_KEY } : {}),
+    ...(process.env.COMPOSIO_USER_ID ? { COMPOSIO_USER_ID: process.env.COMPOSIO_USER_ID } : {}),
+    GEMINI_MODEL: process.env.GEMINI_MODEL ?? "gemini-3.6-flash",
   },
   d1_databases: d1
     ? [

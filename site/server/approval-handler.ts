@@ -1,5 +1,9 @@
 import { PravaClient, PravaRequestError, PravaResponseError } from "../providers/prava/client";
 import { redact } from "../lib/redaction";
+import { GeminiFlashClient } from "../providers/gemini/client";
+import { SensoClient } from "../providers/senso/client";
+import { LinqClient } from "../providers/linq/client";
+import { ComposioClient } from "../providers/composio/client";
 import { identityFromRequest } from "./identity";
 
 type RuntimeEnv = {
@@ -7,6 +11,13 @@ type RuntimeEnv = {
   YUKTI_MODE?: string;
   YUKTI_APP_URL?: string;
   PRAVA_SECRET_KEY?: string;
+  GEMINI_API_KEY?: string;
+  GEMINI_MODEL?: string;
+  SENSO_API_KEY?: string;
+  LINQ_API_TOKEN?: string;
+  LINQ_PHONE_NUMBER?: string;
+  COMPOSIO_API_KEY?: string;
+  COMPOSIO_USER_ID?: string;
 };
 
 type CandidateRow = {
@@ -46,9 +57,55 @@ export async function handleYuktiApi(request: Request, env: RuntimeEnv): Promise
   if (!identity) return reply({ error: "authentication_required" }, 401);
 
   if (url.pathname === "/api/approvals") return createApproval(request, env.DB, identity);
+  if (url.pathname === "/api/prepare") return prepareWithGemini(env, identity);
+  if (url.pathname === "/api/status") return providerStatus(env);
   if (url.pathname === "/api/prava/sessions") return createPravaSession(request, env, identity);
   if (url.pathname === "/api/prava/sessions/revoke") return revokePravaSession(request, env, identity.id);
   return reply({ error: "not_found" }, 404);
+}
+
+async function providerStatus(env: RuntimeEnv) {
+  const linq = env.LINQ_API_TOKEN && env.LINQ_PHONE_NUMBER
+    ? await safeCheck(() => new LinqClient(env.LINQ_API_TOKEN!, env.LINQ_PHONE_NUMBER!).health())
+    : { ok: false as const, reason: "not_configured" };
+  const composio = env.COMPOSIO_API_KEY
+    ? await safeCheck(() => new ComposioClient(env.COMPOSIO_API_KEY!).calendarConnection(env.COMPOSIO_USER_ID ?? "yukti-owner"))
+    : { ok: false as const, reason: "not_configured" };
+
+  return reply({
+    checkedAt: new Date().toISOString(),
+    providers: {
+      prava: { state: env.PRAVA_SECRET_KEY?.startsWith("sk_test_") ? "sandbox_ready" : "not_configured" },
+      senso: { state: env.SENSO_API_KEY ? "configured" : "not_configured" },
+      gemini: { state: env.GEMINI_API_KEY && /gemini-[\w.-]*flash[\w.-]*$/i.test(env.GEMINI_MODEL ?? "gemini-3.6-flash") ? "flash_ready" : "not_configured", model: env.GEMINI_MODEL ?? "gemini-3.6-flash" },
+      linq: linq.ok ? { state: linq.value.configured ? "healthy" : "not_configured", detail: linq.value.status } : { state: "unavailable" },
+      composio: composio.ok && composio.value.connected ? { state: "connected" } : { state: "disconnected", detail: "Calendar consent not granted" },
+    },
+  }, 200);
+}
+
+async function safeCheck<T>(check: () => Promise<T>): Promise<{ ok: true; value: T } | { ok: false; reason: string }> {
+  try { return { ok: true, value: await check() }; }
+  catch { return { ok: false, reason: "provider_unavailable" }; }
+}
+
+async function prepareWithGemini(env: RuntimeEnv, identity: { id: string; displayName: string }) {
+  if (!env.GEMINI_API_KEY) return reply({ error: "gemini_not_configured" }, 503);
+  if (!env.SENSO_API_KEY) return reply({ error: "senso_not_configured" }, 503);
+  await seedJudgeData(env.DB, identity);
+  try {
+    const memories = await new SensoClient(env.SENSO_API_KEY).searchMemory("What gift preferences and activities are known about Sarah?");
+    if (memories.length === 0) return reply({ error: "senso_memory_not_found" }, 404);
+    const brief = await new GeminiFlashClient(env.GEMINI_API_KEY, env.GEMINI_MODEL ?? "gemini-3.6-flash").prepareBirthdayBrief(memories.map((memory) => memory.text).join("\n\n"));
+    const now = new Date().toISOString();
+    await env.DB.prepare(`INSERT INTO audit_events (id, user_id, event_id, kind, detail, created_at, updated_at)
+      VALUES (?, ?, ?, 'preparation.generated', ?, ?, ?)`)
+      .bind(crypto.randomUUID(), identity.id, scoped(identity.id, "evt-sarah"), JSON.stringify({ model: brief.model, usage: brief.usage, sensoContentIds: memories.map((memory) => memory.contentId) }), now, now).run();
+    return reply({ brief, memorySource: { provider: "senso", title: memories[0].title, score: memories[0].score } }, 200);
+  } catch (error) {
+    return reply({ error: "gemini_preparation_failed",
+      ...(error instanceof Error ? { reason: String(redact(error.message)).slice(0, 160) } : {}) }, 502);
+  }
 }
 
 async function createApproval(request: Request, db: D1Database, identity: { id: string; displayName: string }) {
