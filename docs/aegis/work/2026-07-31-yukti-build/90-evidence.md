@@ -33,3 +33,14 @@ Additional evidence is appended by bounded task slice, never as raw secrets or p
 - Composio: the managed Google Calendar account remains `INITIATED`, not active. Consent was cancelled because it requested event editing plus calendar deletion and sharing; Yukti reports this provider as disconnected.
 - Verification: typecheck, lint, 8 test files with 25 passing tests, rendered-output test, and production build pass.
 - Secret boundary: the five local secret values were compared against tracked files and production output; zero exact matches were found. `.env.local` remains ignored.
+
+## Production release gate
+
+- Production URL: `https://yukti-prava.yashns.chatgpt.site`.
+- Access: public URL with Sign in with ChatGPT identity; this resolves the current owner-only mismatch caused by the founder Google account appearing under a temporary migration address.
+- Runtime environment revision 1 contains sandbox mode plus Prava, Senso, Gemini, Linq, and Composio values. Sensitive values are stored as Sites secrets and were not printed or committed.
+- Hosted status check: Prava `sandbox_ready`, Senso `configured`, Gemini `flash_ready` on `gemini-3.6-flash`, Linq `healthy` with provider reputation `HEALTHY`, Composio `disconnected` with calendar consent not granted.
+- Hosted preparation: Senso retrieval and Gemini 3.6 Flash returned a source-labeled decision brief. The request completed without a paid model or Pro model.
+- Hosted approval: the seeded purchase produced a server-recorded, user-scoped, single-use approval in D1.
+- Hosted Prava: Yukti created a secure sandbox checkout session from that approval and then revoked it. The checkout was not opened, no card was entered, and no charge was attempted.
+- Hosted logs: the post-smoke-test Worker error query returned zero events.

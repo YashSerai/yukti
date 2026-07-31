@@ -4,7 +4,7 @@ Updated: `2026-07-31`
 
 ## Current todo
 
-Publish the validated Sites version and verify the production URL.
+Prepare the judge submission and demo script against the verified production release.
 
 ## Active slice
 
@@ -27,6 +27,10 @@ Release gate after the local implementation and provider-integration slices.
 - Composio Calendar remains disconnected because its managed consent requested broad edit and delete scopes
 - Typecheck, lint, 25 unit tests, rendered-output test, and production build pass
 - Exact-value secret scan reports zero hits in tracked source and built output
+- Sites production release published at `https://yukti-prava.yashns.chatgpt.site`
+- Hosted Senso retrieval, Gemini brief, D1 approval, Prava sandbox creation, and Prava revocation verified end to end
+- Hosted provider readiness reports Prava sandbox ready, Senso configured, Gemini Flash ready, Linq healthy, and Composio disconnected
+- Production Worker error log reports zero events for the release smoke-test window
 
 ## Evidence refs
 
@@ -38,15 +42,15 @@ Release gate after the local implementation and provider-integration slices.
 
 ## Blockers
 
-Composio Calendar is intentionally blocked until a least-privilege read-only OAuth configuration is available. This does not block the Prava transaction demo or Sites deployment.
+Composio Calendar is intentionally blocked until a least-privilege read-only OAuth configuration is available. The Sites owner email is `founders@trysoulmate.com`, while the current OpenAI chooser presents a temporary Google migration address; public URL access avoids that owner-only mismatch for judges.
 
 ## Next step
 
-Save and deploy the exact validated source through Sites, configure sandbox runtime values, then run a no-cost production smoke test.
+Write and rehearse the judge demo, then finish the Devpost submission assets. Keep Composio disconnected unless a read-only custom OAuth configuration is available.
 
 ## Resume state
 
-Resume from this checkpoint, inspect Git/worktree and Sites deployment state, and continue the release gate. Do not run a second initializer or grant the current broad Composio Calendar consent.
+Resume from this checkpoint, inspect Git/worktree and the live Sites release, and continue submission preparation. Do not run a second initializer, send a Linq message, or grant the current broad Composio Calendar consent without a concrete demo need.
 
 ## Drift check
 
