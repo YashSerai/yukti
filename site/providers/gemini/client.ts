@@ -30,6 +30,7 @@ export type GroundedProductResearch = {
   summary: string;
   citations: Array<{ url: string; title: string }>;
   searchQueries: string[];
+  toolUsed: "google_search" | "url_context_fallback";
   model: string;
   generatedAt: string;
 };
@@ -114,19 +115,29 @@ export class GeminiFlashClient {
       "Reply in at most three short sentences. Say what is current, what fits, and what the merchant still needs to confirm.",
     ].join("\n");
     const endpoint = "https://generativelanguage.googleapis.com/v1beta/interactions";
-    const response = await fetchWithSingleRetry(this.fetcher, endpoint, () => ({
+    let toolUsed: GroundedProductResearch["toolUsed"] = "google_search";
+    let response = await fetchWithSingleRetry(this.fetcher, endpoint, () => ({
       method: "POST",
       signal: AbortSignal.timeout(25_000),
       headers: { "content-type": "application/json", "x-goog-api-key": this.apiKey },
       body: JSON.stringify({ model: this.model, input: prompt, tools: [{ type: "google_search" }] }),
     }));
+    if (response.status === 429) {
+      toolUsed = "url_context_fallback";
+      response = await fetchWithSingleRetry(this.fetcher, endpoint, () => ({
+        method: "POST",
+        signal: AbortSignal.timeout(25_000),
+        headers: { "content-type": "application/json", "x-goog-api-key": this.apiKey },
+        body: JSON.stringify({ model: this.model, input: prompt, tools: [{ type: "url_context" }] }),
+      }));
+    }
     if (!response.ok) throw new Error(`Gemini grounded search failed with status ${response.status}`);
-    return extractGroundedProductResearch(await response.json(), this.model);
+    return { ...extractGroundedProductResearch(await response.json(), this.model), toolUsed };
   }
 }
 
-export function extractGroundedProductResearch(payload: unknown, fallbackModel: string): GroundedProductResearch {
-  const root = record(payload); const outputs = array(root.output ?? root.outputs);
+export function extractGroundedProductResearch(payload: unknown, fallbackModel: string): Omit<GroundedProductResearch, "toolUsed"> {
+  const root = record(payload); const outputs = array(root.steps ?? root.output ?? root.outputs);
   const textParts = outputs.flatMap((step) => array(record(step).content)).filter((part) => record(part).type === "text");
   const summary = textParts.map((part) => String(record(part).text ?? "")).join(" ").trim().slice(0, 800);
   const citations = textParts.flatMap((part) => array(record(part).annotations)).filter((item) => record(item).type === "url_citation")

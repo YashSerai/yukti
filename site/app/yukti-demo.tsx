@@ -383,14 +383,14 @@ function PeopleView({ snapshot, busy, error, authenticated, onReload, onUpdate, 
 
 function LiveProductCard({ product, busy, onApprove }: { product: ConciergeSnapshot["products"][number]; busy: boolean; onApprove: (product: ConciergeSnapshot["products"][number]) => Promise<void> }) {
   const evidence = parseProductEvidence(product.evidence);
-  return <article>{product.imageUrl && <img src={product.imageUrl} alt="" />}<div><span>{product.merchant} · retrieved {new Date(product.retrievedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span><h3>{product.title}</h3><strong>From {money(product.amountMinor, product.currency)}</strong><p>{product.availability}</p>{evidence && <div className="grounding-note"><small>Google Search checked for {evidence.location}. The merchant still confirms the exact address and delivery date.</small>{evidence.citations.map((citation, index) => <a key={citation.url} href={citation.url} target="_blank" rel="noreferrer">Source {index + 1}: {citation.title}</a>)}</div>}<div className="product-actions"><button onClick={() => void onApprove(product)} disabled={busy}>Approve this exact option</button><a href={product.url} target="_blank" rel="noreferrer">View current merchant page</a></div></div></article>;
+  return <article>{product.imageUrl && <img src={product.imageUrl} alt="" />}<div><span>{product.merchant} · retrieved {new Date(product.retrievedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span><h3>{product.title}</h3><strong>From {money(product.amountMinor, product.currency)}</strong><p>{product.availability}</p>{evidence && <div className="grounding-note"><small>{evidence.toolUsed === "google_search" ? "Google Search checked" : "Gemini checked the live merchant page"} for {evidence.location}. The merchant still confirms the exact address and delivery date.</small>{evidence.citations.map((citation, index) => <a key={citation.url} href={citation.url} target="_blank" rel="noreferrer">Source {index + 1}: {citation.title}</a>)}</div>}<div className="product-actions"><button onClick={() => void onApprove(product)} disabled={busy}>Approve this exact option</button><a href={product.url} target="_blank" rel="noreferrer">View current merchant page</a></div></div></article>;
 }
 
 function parseProductEvidence(raw: string) {
   try {
-    const value = JSON.parse(raw) as { deliveryLocation?: string; groundedResearch?: { citations?: Array<{ url: string; title: string }> } };
+    const value = JSON.parse(raw) as { deliveryLocation?: string; groundedResearch?: { toolUsed?: "google_search" | "url_context_fallback"; citations?: Array<{ url: string; title: string }> } };
     const citations = value.groundedResearch?.citations?.filter((item) => /^https:\/\//.test(item.url)).slice(0, 3) ?? [];
-    return value.deliveryLocation && citations.length ? { location: value.deliveryLocation, citations } : null;
+    return value.deliveryLocation && citations.length ? { location: value.deliveryLocation, citations, toolUsed: value.groundedResearch?.toolUsed ?? "google_search" } : null;
   } catch { return null; }
 }
 
