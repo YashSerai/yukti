@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { fetchWithSingleRetry } from "../retry";
 
 const searchResponse = z.object({
   results: z.array(z.object({
@@ -17,12 +18,12 @@ export class SensoClient {
   }
 
   async searchMemory(query: string): Promise<SensoMemory[]> {
-    const response = await this.fetcher("https://apiv2.senso.ai/api/v1/org/search/context", {
+    const response = await fetchWithSingleRetry(this.fetcher, "https://apiv2.senso.ai/api/v1/org/search/context", () => ({
       method: "POST",
       signal: AbortSignal.timeout(10_000),
       headers: { "content-type": "application/json", accept: "application/json", "x-api-key": this.apiKey },
       body: JSON.stringify({ query, max_results: 3 }),
-    });
+    }));
     if (!response.ok) throw new Error(`Senso request failed with status ${response.status}`);
     const result = searchResponse.parse(await response.json());
     return result.results.map((item) => ({ contentId: item.content_id, title: item.title, text: item.chunk_text, score: item.score }));

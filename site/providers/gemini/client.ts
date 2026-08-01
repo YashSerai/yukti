@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { fetchWithSingleRetry } from "../retry";
 
 const preparationSchema = z.object({
   summary: z.string().min(1).max(240),
@@ -48,31 +49,33 @@ export class GeminiFlashClient {
       "Candidate cand-book: The Art of Still Life, Paper Hound, CAD 38.00, fixture says pickup today.",
       "Return a concise decision brief for the user. The caution must clearly say that availability and delivery are fixture data until verified.",
     ].join("\n");
-    const response = await this.fetcher(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(this.model)}:generateContent`, {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(this.model)}:generateContent`;
+    const body = JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        maxOutputTokens: 2048,
+        thinkingConfig: { thinkingLevel: "minimal" },
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "OBJECT",
+          properties: {
+            summary: { type: "STRING" },
+            candidateReasons: { type: "ARRAY", items: { type: "OBJECT", properties: {
+              candidateId: { type: "STRING", enum: ["cand-tea", "cand-book"] },
+              reason: { type: "STRING" },
+            }, required: ["candidateId", "reason"] } },
+            caution: { type: "STRING" },
+          },
+          required: ["summary", "candidateReasons", "caution"],
+        },
+      },
+    });
+    const response = await fetchWithSingleRetry(this.fetcher, endpoint, () => ({
       method: "POST",
       signal: AbortSignal.timeout(20_000),
       headers: { "content-type": "application/json", "x-goog-api-key": this.apiKey },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          maxOutputTokens: 2048,
-          thinkingConfig: { thinkingLevel: "minimal" },
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: "OBJECT",
-            properties: {
-              summary: { type: "STRING" },
-              candidateReasons: { type: "ARRAY", items: { type: "OBJECT", properties: {
-                candidateId: { type: "STRING", enum: ["cand-tea", "cand-book"] },
-                reason: { type: "STRING" },
-              }, required: ["candidateId", "reason"] } },
-              caution: { type: "STRING" },
-            },
-            required: ["summary", "candidateReasons", "caution"],
-          },
-        },
-      }),
-    });
+      body,
+    }));
     if (!response.ok) throw new Error(`Gemini request failed with status ${response.status}`);
     const parsedResponse = responseSchema.parse(await response.json());
     const candidate = parsedResponse.candidates[0];

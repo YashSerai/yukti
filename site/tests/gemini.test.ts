@@ -28,4 +28,22 @@ describe("Gemini Flash adapter", () => {
     const brief = await new GeminiFlashClient("key", "gemini-3.6-flash", fetcher as typeof fetch).prepareBirthdayBrief();
     expect(brief).toMatchObject({ model: "gemini-3.6-flash", usage: { promptTokens: 100, outputTokens: 50 } });
   });
+
+  it("retries one transient gateway failure", async () => {
+    const success = JSON.stringify({
+      candidates: [{ finishReason: "STOP", content: { parts: [{ text: JSON.stringify({
+        summary: "Both options fit.",
+        candidateReasons: [
+          { candidateId: "cand-tea", reason: "Matches the tea preference." },
+          { candidateId: "cand-book", reason: "Matches the ceramics interest." },
+        ],
+        caution: "Availability and delivery remain fixture data until verified.",
+      }) }] } }],
+    });
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response("gateway", { status: 502 }))
+      .mockResolvedValueOnce(new Response(success));
+    await expect(new GeminiFlashClient("key", "gemini-3.6-flash", fetcher).prepareBirthdayBrief()).resolves.toMatchObject({ summary: "Both options fit." });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
 });

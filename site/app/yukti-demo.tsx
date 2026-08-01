@@ -5,6 +5,7 @@ import { seedAudit, seedCandidates, seedEvents } from "../lib/seed";
 
 type View = "Today" | "People" | "Wallet" | "Audit";
 type SandboxSession = { transactionId: string; checkoutUrl: string; expiresAt: string };
+type SandboxOutcome = { state: "pending" | "sandbox_declined" | "completed" | "failed"; scopedCredentialsReceived: boolean; providerConfirmation?: string };
 type PreparationBrief = { summary: string; candidateReasons: Array<{ candidateId: string; reason: string }>; caution: string; model: string };
 type ProviderStatus = { checkedAt: string; providers: Record<string, { state: string; detail?: string; model?: string }> };
 type GitHubUser = { login: string; displayName: string };
@@ -23,6 +24,7 @@ export function YuktiDemo() {
   const [approvalBusy, setApprovalBusy] = useState(false);
   const [approvalError, setApprovalError] = useState<string | null>(null);
   const [sandboxSession, setSandboxSession] = useState<SandboxSession | null>(null);
+  const [sandboxOutcome, setSandboxOutcome] = useState<SandboxOutcome | null>(null);
   const [paymentBusy, setPaymentBusy] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [brief, setBrief] = useState<PreparationBrief | null>(null);
@@ -48,7 +50,7 @@ export function YuktiDemo() {
 
   const reset = () => {
     if (sandboxSession) return;
-    setView("Today"); setSelectedEvent(seedEvents[0].id); setSelectedCandidate(seedCandidates[0].id); setReviewing(false); setApproved(false); setApprovalId(null); setApprovalError(null); setPaymentError(null); setBrief(null); setBriefError(null);
+    setView("Today"); setSelectedEvent(seedEvents[0].id); setSelectedCandidate(seedCandidates[0].id); setReviewing(false); setApproved(false); setApprovalId(null); setApprovalError(null); setPaymentError(null); setSandboxOutcome(null); setBrief(null); setBriefError(null);
   };
 
   const checkProviders = async () => {
@@ -83,8 +85,22 @@ export function YuktiDemo() {
       const result = await response.json() as Partial<SandboxSession> & { error?: string };
       if (!response.ok || !result.transactionId || !result.checkoutUrl || !result.expiresAt) throw new Error(result.error ?? "session_failed");
       setSandboxSession(result as SandboxSession);
+      setSandboxOutcome(null);
     } catch {
       setPaymentError("Prava’s sandbox could not start. Create a fresh approval and try again.");
+    } finally { setPaymentBusy(false); }
+  };
+
+  const verifyPrava = async () => {
+    if (!sandboxSession) return;
+    setPaymentBusy(true); setPaymentError(null);
+    try {
+      const response = await fetch("/api/prava/sessions/verify", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ transactionId: sandboxSession.transactionId }) });
+      const result = await response.json() as SandboxOutcome & { error?: string };
+      if (!response.ok && response.status !== 202) throw new Error(result.error ?? "verify_failed");
+      setSandboxOutcome(result);
+    } catch {
+      setPaymentError("Prava’s result is not available yet. No purchase was retried.");
     } finally { setPaymentBusy(false); }
   };
 
@@ -179,9 +195,12 @@ export function YuktiDemo() {
                   {!approved && user && <button className="primary" onClick={() => setReviewing(true)}>Review and approve</button>}
                   {!approved && !user && <a className="primary" href="/api/auth/github/start?return_to=/">Sign in to approve</a>}
                   {approved && !sandboxSession && <button className="primary" onClick={startPrava} disabled={paymentBusy}>{paymentBusy ? "Starting sandbox…" : "Continue in Prava sandbox"}</button>}
-                  {sandboxSession && <div className="sandbox-actions"><a className="primary" href={sandboxSession.checkoutUrl} target="_blank" rel="noreferrer">Open secure Prava checkout</a><button onClick={cancelPrava} disabled={paymentBusy}>{paymentBusy ? "Cancelling…" : "Cancel sandbox session"}</button></div>}
+                  {sandboxSession && <div className="sandbox-actions"><a className="primary" href={sandboxSession.checkoutUrl} target="_blank" rel="noreferrer">Open secure Prava checkout</a><button onClick={verifyPrava} disabled={paymentBusy}>{paymentBusy ? "Checking…" : "Verify sandbox result"}</button><button onClick={cancelPrava} disabled={paymentBusy || sandboxOutcome?.state === "sandbox_declined" || sandboxOutcome?.state === "completed"}>{paymentBusy ? "Cancelling…" : "Cancel sandbox session"}</button></div>}
                   {approvalId && !sandboxSession && <p className="microcopy" role="status">Approval {approvalId.slice(0, 8)} is ready for a Prava sandbox session.</p>}
                   {sandboxSession && <p className="microcopy" role="status">Prava created a secure, scoped sandbox session. No live charge is possible.</p>}
+                  {sandboxOutcome?.state === "pending" && <p className="microcopy" role="status">Prava is still securing the sandbox card. Check again in a moment.</p>}
+                  {sandboxOutcome?.state === "sandbox_declined" && <p className="microcopy success-note" role="status">Scoped credentials received. The seeded merchant simulator declined the test card, and Yukti reported that outcome to Prava.</p>}
+                  {sandboxOutcome?.state === "completed" && <p className="microcopy success-note" role="status">Prava confirmed the sandbox transaction lifecycle.</p>}
                   {paymentError && <p className="form-error" role="alert">{paymentError}</p>}
                   <p className="microcopy">Approval is single-use and cannot be applied to another item, merchant, or amount.</p>
                 </section>

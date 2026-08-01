@@ -49,7 +49,7 @@ type ApprovalRow = {
   consumed_at: string | null;
 };
 
-type TransactionRow = { transaction_id: string; prava_session_id: string | null; state: string };
+type TransactionRow = { transaction_id: string; prava_session_id: string | null; state: string; event_id?: string };
 
 const jsonHeaders = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
 
@@ -94,6 +94,10 @@ export async function handleYuktiApi(request: Request, env: RuntimeEnv): Promise
     if (url.pathname === "/api/prava/sessions/revoke") {
       await consumeRateLimit(env.DB, "prava-revoke", identity.id, 10, 60 * 60_000);
       return revokePravaSession(request, env, identity.id);
+    }
+    if (url.pathname === "/api/prava/sessions/verify") {
+      await consumeRateLimit(env.DB, "prava-verify", identity.id, 20, 60 * 60_000);
+      return verifyPravaSession(request, env, identity.id);
     }
     return reply({ error: "not_found" }, 404);
   } catch (error) {
@@ -261,6 +265,49 @@ async function revokePravaSession(request: Request, env: RuntimeEnv, userId: str
       : error instanceof Error ? String(redact(error.message)).slice(0, 120)
       : "UNKNOWN";
     return reply({ error: "prava_revoke_failed", providerCode }, 502);
+  }
+}
+
+async function verifyPravaSession(request: Request, env: RuntimeEnv, userId: string) {
+  if (env.YUKTI_MODE !== "sandbox") return reply({ error: "prava_sandbox_not_enabled" }, 409);
+  if (!env.PRAVA_SECRET_KEY?.startsWith("sk_test_")) return reply({ error: "prava_sandbox_not_configured" }, 503);
+  const body = await readBody(request);
+  const transactionId = typeof body?.transactionId === "string" ? body.transactionId : "";
+  if (!transactionId) return reply({ error: "transaction_required" }, 400);
+  const transaction = await env.DB.prepare(`
+    SELECT t.id AS transaction_id, t.prava_session_id, t.state, a.event_id
+    FROM transactions t JOIN approvals a ON a.id = t.approval_id
+    WHERE t.id = ? AND a.user_id = ?
+  `).bind(transactionId, userId).first<TransactionRow>();
+  if (!transaction?.prava_session_id) return reply({ error: "prava_session_not_found" }, 404);
+  if (transaction.state !== "purchasing") return reply({ transactionId, state: transaction.state, scopedCredentialsReceived: false }, 200);
+
+  try {
+    const result = await new PravaClient(env.PRAVA_SECRET_KEY).executeAwaitingPayment(
+      transaction.prava_session_id,
+      async () => ({ status: "DECLINED", responseCode: "05", amountPaid: "0.00" }),
+    );
+    if (result.state === "pending") {
+      return reply({ transactionId, state: "pending", scopedCredentialsReceived: false }, 202);
+    }
+
+    const now = new Date().toISOString();
+    const scopedCredentialsReceived = Boolean(result.reference);
+    const state = result.state === "completed" ? "completed" : "sandbox_declined";
+    await env.DB.batch([
+      env.DB.prepare(`UPDATE transactions SET state = ?, merchant_reference = ?, failure_code = ?, updated_at = ? WHERE id = ? AND state = 'purchasing'`)
+        .bind(result.state, result.reference ?? null, result.state === "failed" ? "sandbox_test_card_declined" : null, now, transactionId),
+      env.DB.prepare(`INSERT INTO audit_events (id, user_id, event_id, kind, detail, created_at, updated_at)
+        VALUES (?, ?, ?, 'payment.sandbox_result', ?, ?, ?)`)
+        .bind(crypto.randomUUID(), userId, transaction.event_id ?? null, JSON.stringify({ transactionId, state, scopedCredentialsReceived, providerConfirmation: result.networkConfirmation ?? null }), now, now),
+    ]);
+    return reply({ transactionId, state, scopedCredentialsReceived, providerConfirmation: result.networkConfirmation }, 200);
+  } catch (error) {
+    const providerCode = error instanceof PravaRequestError ? error.code
+      : error instanceof PravaResponseError ? `INVALID_RESPONSE_${error.issue.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}`
+      : "NETWORK_OR_RUNTIME_ERROR";
+    return reply({ error: "prava_result_check_failed", providerCode,
+      ...(error instanceof PravaRequestError && error.responseId ? { responseId: error.responseId } : {}) }, 502);
   }
 }
 

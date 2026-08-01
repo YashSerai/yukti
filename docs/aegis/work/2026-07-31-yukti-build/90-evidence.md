@@ -55,3 +55,25 @@ Additional evidence is appended by bounded task slice, never as raw secrets or p
 - Production proof: GitHub returned `@YashSerai`; readiness reported Prava `sandbox_ready`, Senso `configured`, Gemini `flash_ready`, Linq `healthy`, and Composio `disconnected`. Senso-to-Gemini preparation completed, D1 recorded a user-scoped approval, Prava created a scoped sandbox checkout session, and Yukti revoked it without opening checkout, entering a card, or attempting a charge. Logout returned the app to its anonymous gated state.
 - Runtime note: the first protected Gemini preparation returned a transient `502`; a bounded retry completed successfully. Production browser console logs were empty.
 - URL boundary: Sites supports changing the display title but not an existing URL slug. The live URL therefore remains `https://yukti-prava.yashns.chatgpt.site` unless an approved migration or custom domain is used.
+
+## Canonical migration and sponsor authorization
+
+- The user approved a new Sites project to obtain the exact slug. Canonical project `appgprj_6a6d57a3299c8191a51d8b03ac7cc5fc` is public at `https://yukti.yashns.chatgpt.site`; the previous project remains online as rollback.
+- Runtime environment revision 1 contains the same sandbox provider configuration. Secrets were copied through the Sites environment interface and were not printed or committed.
+- GitHub OAuth application 3765534 now uses the canonical homepage and callback URL. Production login returned `@YashSerai`.
+- The user explicitly approved Composio's disclosed Google Calendar consent, including broad event and calendar management scopes. Exact product user `yukti-owner` is active through connected account `ca_LkSAhtO9GyFG`.
+- Hosted readiness now reports Prava `sandbox_ready`, Senso `configured`, Gemini `flash_ready`, Linq `healthy`, and Composio `connected`.
+
+## Prava hosted test-card attempt
+
+- Approval prefix `dafd26ad` created Prava sandbox session `ses_01KYXJJRRGBQFD0A37DDA3QHVN` for Granville Tea Co., Jasmine tea tasting set, CAD 42.00.
+- The hosted Prava checkout accepted the displayed Visa sandbox card values and terms. No real card or billing identity was used.
+- After submission, Prava remained on `Securing your card details…`. A direct authenticated payment-result check reported `pending`, zero transactions, and no scoped credentials.
+- Because Prava had not issued credentials, Yukti did not claim a completed payment and did not report a fabricated merchant result.
+- The new verification endpoint safely polls the owned transaction. If Prava returns `awaiting_result`, credentials remain inside the server callback, the deterministic seeded merchant returns a test-card decline, Yukti reports that known outcome to Prava, and only a non-sensitive reference and confirmation are persisted.
+
+## Final local release candidate
+
+- Gemini and Senso retry a single 502, 503, or 504 response. Timeouts and transaction mutations are never automatically retried.
+- Typecheck, lint, 9 test files with 30 passing tests, and production build pass after the verification and retry changes.
+- Submission copy, a two-minute demo script, eligibility checklist, and real-versus-simulated disclosure are present in the repository.
