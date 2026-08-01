@@ -250,7 +250,7 @@ export function YuktiDemo() {
           : <a className="auth-control sign-in" href="/api/auth/github/start?return_to=/">{authChecking ? "Checking sign-in…" : "Sign in with GitHub"}</a>}
       </header>
 
-      <div className="demo-strip"><span>{concierge?.mode === "connected" ? "Memory connected" : "Private by design"}</span><p>{concierge?.mode === "connected" ? "Messages and product research are connected. You approve every purchase." : "Sign in to use personal memory, current recommendations, and purchase approvals."}</p><button onClick={reset} disabled={Boolean(sandboxSession)} title={sandboxSession ? "Cancel the open checkout before resetting" : undefined}>Reset</button></div>
+      <div className="privacy-strip"><span>{concierge?.mode === "connected" ? "Memory connected" : "Private by design"}</span><p>{concierge?.mode === "connected" ? "Messages and product research are connected. You approve every purchase." : "Sign in to use personal memory, current recommendations, and purchase approvals."}</p><button onClick={reset} disabled={Boolean(sandboxSession)} title={sandboxSession ? "Cancel the open checkout before resetting" : undefined}>Reset</button></div>
       {!authChecking && !user && <div className="auth-banner"><div><strong>Sign in to make Yukti yours.</strong><p>Your people, recommendations, and approvals stay tied to your account.</p></div><a href="/api/auth/github/start?return_to=/">Continue with GitHub</a></div>}
 
       {view === "Today" ? (
