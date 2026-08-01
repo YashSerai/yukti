@@ -13,7 +13,7 @@ Checked against the published Agentic Commerce Hackathon Builder Handbook on Jul
 - [x] Partner implementation boundaries documented
 - [x] Pre-existing work disclosure
 - [x] What worked, what did not, and what we learned
-- [ ] Screenshots captured from the final production version
+- [x] Screenshots captured from the final production version
 - [ ] Devfolio project published and status verified as **Submitted**
 
 ## Product gate
@@ -37,4 +37,3 @@ Checked against the published Agentic Commerce Hackathon Builder Handbook on Jul
 ## Submission timing
 
 The handbook contains conflicting deadline text: its main schedule says August 2 at 7:00 PM PT, while a later “hard deadline” paragraph says August 2 at 3:00 PM PT. Treat **August 2 at 3:00 PM PT** as the safe cutoff and verify the live Devfolio dashboard before publishing.
-
