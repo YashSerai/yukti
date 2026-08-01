@@ -13,6 +13,7 @@ export class ComposioClient {
   async calendarConnection(userId: string) {
     const params = new URLSearchParams({ limit: "20", user_ids: userId, toolkit_slugs: "googlecalendar", statuses: "ACTIVE" });
     const response = await this.fetcher(`https://backend.composio.dev/api/v3.1/connected_accounts?${params}`, {
+      signal: AbortSignal.timeout(10_000),
       headers: { "x-api-key": this.apiKey, accept: "application/json" },
     });
     if (!response.ok) throw new Error(`Composio request failed with status ${response.status}`);

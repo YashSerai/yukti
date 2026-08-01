@@ -43,6 +43,7 @@ export class PravaClient implements PaymentProvider {
   private async request(path: string, init?: RequestInit) {
     const response = await this.fetcher(`${this.baseUrl}${path}`, {
       ...init,
+      signal: init?.signal ?? AbortSignal.timeout(10_000),
       headers: { Authorization: `Bearer ${this.secretKey}`, "Content-Type": "application/json", ...init?.headers },
     });
     if (!response.ok) {

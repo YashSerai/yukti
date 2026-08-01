@@ -4,6 +4,9 @@ Yukti prepares the small life-admin decisions that are easy to miss, then waits 
 
 ## Safety boundary
 
+- Sponsor integrations require an app-owned GitHub session. Yukti requests no repository or email scope, stores only the numeric GitHub identity and display metadata, and never persists the GitHub access token.
+- OAuth state uses PKCE, a single-use D1 record, and a secure `HttpOnly` host cookie. Application sessions use a random internal user ID and a server-hashed secret.
+- Sandbox mutations require a same-origin browser request. Per-user and global provider quotas, short network timeouts, and `429 Retry-After` responses bound accidental or scripted API-key use.
 - Browser input names only a candidate. The server resolves the event, merchant, amount, currency, and owner from D1.
 - Approvals expire after 15 minutes and are consumed atomically before a Prava session is created.
 - Only `sk_test_` Prava keys are accepted. Live keys are rejected at configuration and adapter boundaries.
@@ -31,6 +34,7 @@ The Sites build packages the D1 migrations from `drizzle/`. For a local Miniflar
 ```bash
 npm run build
 npx wrangler d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_outstanding_risque.sql
+npx wrangler d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0001_github_auth_guardrails.sql
 ```
 
 Copy `.env.example` to an ignored local environment file or inject the same names through the runtime. Never commit real values.
@@ -45,4 +49,4 @@ npm run build
 npm run test:rendered
 ```
 
-The app runs on ChatGPT Sites through Vinext and Cloudflare Workers, with D1 as the durable store. Hosted Sites injects Sign in with ChatGPT identity headers; local `seeded` mode uses a clearly marked fixture identity.
+The app runs on ChatGPT Sites through Vinext and Cloudflare Workers, with D1 as the durable store. Hosted sponsor actions use Yukti's GitHub OAuth session; local `seeded` mode uses a clearly marked fixture identity.

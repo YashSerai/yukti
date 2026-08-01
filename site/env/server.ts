@@ -17,6 +17,9 @@ const serverEnvSchema = z.object({
   GOOGLE_CLOUD_LOCATION: z.string().min(1).default("us-central1"),
   GEMINI_MODEL: z.string().min(1).optional(),
   GEMINI_API_KEY: z.string().min(1).optional(),
+  GITHUB_CLIENT_ID: z.string().min(1).optional(),
+  GITHUB_CLIENT_SECRET: z.string().min(1).optional(),
+  GITHUB_CALLBACK_URL: optionalUrl,
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

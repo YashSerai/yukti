@@ -44,3 +44,18 @@ export const auditEvents = sqliteTable("audit_events", {
   id: text("id").primaryKey(), userId: text("user_id").notNull().references(() => users.id), eventId: text("event_id").references(() => events.id),
   kind: text("kind").notNull(), detail: text("detail").notNull(), ...timestamps,
 });
+export const githubIdentities = sqliteTable("github_identities", {
+  providerSubject: text("provider_subject").primaryKey(), userId: text("user_id").notNull().unique().references(() => users.id),
+  login: text("login").notNull(), displayName: text("display_name"), createdAt: integer("created_at").notNull(), updatedAt: integer("updated_at").notNull(),
+});
+export const webLoginAttempts = sqliteTable("web_login_attempts", {
+  stateHash: text("state_hash").primaryKey(), codeVerifier: text("code_verifier").notNull(), returnTo: text("return_to").notNull(),
+  expiresAt: integer("expires_at").notNull(), consumedAt: integer("consumed_at"), createdAt: integer("created_at").notNull(),
+});
+export const webSessions = sqliteTable("web_sessions", {
+  id: text("id").primaryKey(), userId: text("user_id").notNull().references(() => users.id), tokenHash: text("token_hash").notNull(),
+  expiresAt: integer("expires_at").notNull(), revokedAt: integer("revoked_at"), createdAt: integer("created_at").notNull(),
+});
+export const rateLimits = sqliteTable("rate_limits", {
+  key: text("key").primaryKey(), attemptCount: integer("attempt_count").notNull(), windowExpiresAt: integer("window_expires_at").notNull(),
+});

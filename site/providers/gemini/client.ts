@@ -50,6 +50,7 @@ export class GeminiFlashClient {
     ].join("\n");
     const response = await this.fetcher(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(this.model)}:generateContent`, {
       method: "POST",
+      signal: AbortSignal.timeout(20_000),
       headers: { "content-type": "application/json", "x-goog-api-key": this.apiKey },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],

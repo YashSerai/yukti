@@ -20,6 +20,7 @@ export class LinqClient implements MessagingProvider {
   private async request(path: string, init?: RequestInit) {
     const response = await this.fetcher(`https://api.linqapp.com/api/partner/v3${path}`, {
       ...init,
+      signal: init?.signal ?? AbortSignal.timeout(10_000),
       headers: { authorization: `Bearer ${this.token}`, "content-type": "application/json", ...init?.headers },
     });
     if (!response.ok) throw new Error(`Linq request failed with status ${response.status}`);

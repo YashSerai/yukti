@@ -16,6 +16,9 @@ interface Env {
   LINQ_PHONE_NUMBER?: string;
   COMPOSIO_API_KEY?: string;
   COMPOSIO_USER_ID?: string;
+  GITHUB_CLIENT_ID?: string;
+  GITHUB_CLIENT_SECRET?: string;
+  GITHUB_CALLBACK_URL?: string;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -41,21 +44,30 @@ const worker = {
     const url = new URL(request.url);
 
     const apiResponse = await handleYuktiApi(request, env);
-    if (apiResponse) return apiResponse;
+    if (apiResponse) return harden(apiResponse);
 
     if (url.pathname === "/_vinext/image") {
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
-      return handleImageOptimization(request, {
+      return harden(await handleImageOptimization(request, {
         fetchAsset: (path) => env.ASSETS.fetch(new Request(new URL(path, request.url))),
         transformImage: async (body, { width, format, quality }) => {
           const result = await env.IMAGES.input(body).transform(width > 0 ? { width } : {}).output({ format, quality });
           return result.response();
         },
-      }, allowedWidths);
+      }, allowedWidths));
     }
 
-    return handler.fetch(request, env, ctx);
+    return harden(await handler.fetch(request, env, ctx));
   },
 };
+
+function harden(response: Response) {
+  const secured = new Response(response.body, response);
+  secured.headers.set("x-content-type-options", "nosniff");
+  secured.headers.set("x-frame-options", "DENY");
+  secured.headers.set("referrer-policy", "strict-origin-when-cross-origin");
+  secured.headers.set("permissions-policy", "camera=(), geolocation=(), microphone=()");
+  return secured;
+}
 
 export default worker;

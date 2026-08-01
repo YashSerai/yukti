@@ -5,6 +5,8 @@ import { SensoClient } from "../providers/senso/client";
 import { LinqClient } from "../providers/linq/client";
 import { ComposioClient } from "../providers/composio/client";
 import { identityFromRequest } from "./identity";
+import { beginGitHubLogin, finishGitHubLogin, logoutGitHub, sha256 } from "./github-auth";
+import { consumeRateLimit, guardProviderUse, RateLimitError, requireSameOrigin } from "./rate-limit";
 
 type RuntimeEnv = {
   DB: D1Database;
@@ -18,6 +20,9 @@ type RuntimeEnv = {
   LINQ_PHONE_NUMBER?: string;
   COMPOSIO_API_KEY?: string;
   COMPOSIO_USER_ID?: string;
+  GITHUB_CLIENT_ID?: string;
+  GITHUB_CLIENT_SECRET?: string;
+  GITHUB_CALLBACK_URL?: string;
 };
 
 type CandidateRow = {
@@ -51,17 +56,50 @@ const jsonHeaders = { "content-type": "application/json; charset=utf-8", "cache-
 export async function handleYuktiApi(request: Request, env: RuntimeEnv): Promise<Response | null> {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/api/")) return null;
-  if (request.method !== "POST") return reply({ error: "method_not_allowed" }, 405);
+  try {
+    if (url.pathname === "/api/auth/github/start" && request.method === "GET") {
+      const actor = await sha256(request.headers.get("cf-connecting-ip") || "unknown");
+      await consumeRateLimit(env.DB, "github-login", actor, 10, 60 * 60_000);
+      return beginGitHubLogin(request, env);
+    }
+    if (url.pathname === "/api/auth/github/callback" && request.method === "GET") return finishGitHubLogin(request, env);
+    if (url.pathname === "/api/me" && request.method === "GET") {
+      const identity = await identityFromRequest(request, env.DB, env.YUKTI_MODE);
+      return identity ? reply({ user: { login: identity.login, displayName: identity.displayName } }, 200) : reply({ error: "authentication_required" }, 401);
+    }
+    if (request.method !== "POST") return reply({ error: "method_not_allowed" }, 405);
+    const originError = requireSameOrigin(request, env.YUKTI_MODE);
+    if (originError) return originError;
+    if (url.pathname === "/api/auth/logout") return logoutGitHub(request, env.DB);
 
-  const identity = await identityFromRequest(request, env.YUKTI_MODE);
-  if (!identity) return reply({ error: "authentication_required" }, 401);
-
-  if (url.pathname === "/api/approvals") return createApproval(request, env.DB, identity);
-  if (url.pathname === "/api/prepare") return prepareWithGemini(env, identity);
-  if (url.pathname === "/api/status") return providerStatus(env);
-  if (url.pathname === "/api/prava/sessions") return createPravaSession(request, env, identity);
-  if (url.pathname === "/api/prava/sessions/revoke") return revokePravaSession(request, env, identity.id);
-  return reply({ error: "not_found" }, 404);
+    const identity = await identityFromRequest(request, env.DB, env.YUKTI_MODE);
+    if (!identity) return reply({ error: "authentication_required" }, 401);
+    if (url.pathname === "/api/approvals") {
+      await consumeRateLimit(env.DB, "approval", identity.id, 20, 60 * 60_000);
+      return createApproval(request, env.DB, identity);
+    }
+    if (url.pathname === "/api/prepare") {
+      await guardProviderUse(env.DB, "prepare", identity.id);
+      return prepareWithGemini(env, identity);
+    }
+    if (url.pathname === "/api/status") {
+      await consumeRateLimit(env.DB, "status", identity.id, 6, 10 * 60_000);
+      await consumeRateLimit(env.DB, "status:global", "all", 60, 10 * 60_000);
+      return providerStatus(env);
+    }
+    if (url.pathname === "/api/prava/sessions") {
+      await guardProviderUse(env.DB, "prava", identity.id);
+      return createPravaSession(request, env, identity);
+    }
+    if (url.pathname === "/api/prava/sessions/revoke") {
+      await consumeRateLimit(env.DB, "prava-revoke", identity.id, 10, 60 * 60_000);
+      return revokePravaSession(request, env, identity.id);
+    }
+    return reply({ error: "not_found" }, 404);
+  } catch (error) {
+    if (error instanceof RateLimitError) return reply({ error: "rate_limited", retryAfterSeconds: error.retryAfterSeconds }, 429, { "retry-after": String(error.retryAfterSeconds) });
+    return reply({ error: "request_failed" }, 500);
+  }
 }
 
 async function providerStatus(env: RuntimeEnv) {
@@ -255,6 +293,6 @@ async function readBody(request: Request): Promise<Record<string, unknown> | nul
   }
 }
 
-function reply(body: unknown, status: number) {
-  return new Response(JSON.stringify(body), { status, headers: jsonHeaders });
+function reply(body: unknown, status: number, extraHeaders?: Record<string, string>) {
+  return new Response(JSON.stringify(body), { status, headers: { ...jsonHeaders, ...extraHeaders } });
 }
