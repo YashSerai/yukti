@@ -13,7 +13,7 @@ describe("Linq adapter", () => {
       const body = JSON.parse(String(init?.body));
       expect(body.message.idempotency_key).toMatch(/^yukti-[a-f0-9]{24}$/);
       expect(body).toMatchObject({ from: "+12134989364", to: ["+17782316707"], message: { parts: [{ type: "text", value: "Yukti reminder" }] } });
-      return new Response(JSON.stringify({ id: "chat-1" }));
+      return new Response(JSON.stringify({ chat: { id: "chat-1" } }));
     });
     const result = await new LinqClient("token", "+12134989364", fetcher as typeof fetch).sendApprovedMessage("+17782316707", "Yukti reminder");
     expect(result).toMatchObject({ messageId: "chat-1", evidence: { provider: "linq", sourceKind: "sandbox" } });

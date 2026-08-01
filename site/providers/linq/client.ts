@@ -5,7 +5,7 @@ const phoneNumbersResponse = z.object({ phone_numbers: z.array(z.object({
   id: z.string().min(1), phone_number: z.string().regex(/^\+[1-9]\d{7,14}$/),
   reputation: z.object({ status: z.string() }),
 })) });
-const chatResponse = z.object({ id: z.string().min(1) }).passthrough();
+const chatResponse = z.object({ chat: z.object({ id: z.string().min(1) }).passthrough() }).passthrough();
 
 export class LinqClient implements MessagingProvider {
   constructor(
@@ -43,7 +43,7 @@ export class LinqClient implements MessagingProvider {
       to: [to],
       message: { parts: [{ type: "text", value: body }], idempotency_key: idempotencyKey },
     }) })).json());
-    return { messageId: result.id, evidence: { sourceKind: "sandbox" as const, provider: "linq", retrievedAt: new Date().toISOString(), reference: result.id } };
+    return { messageId: result.chat.id, evidence: { sourceKind: "sandbox" as const, provider: "linq", retrievedAt: new Date().toISOString(), reference: result.chat.id } };
   }
 }
 
