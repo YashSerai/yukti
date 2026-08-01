@@ -20,6 +20,13 @@ type ConciergeSnapshot = {
 
 const money = (amount: number, currency: string) => new Intl.NumberFormat("en-CA", { style: "currency", currency }).format(amount / 100);
 
+const memoryDisplayValue = (fact: ConciergeSnapshot["facts"][number]) => {
+  const raw = fact.value || fact.fact;
+  if (fact.kind !== "budget") return raw;
+  const parsed = /^(\d+)\s+([A-Z]{3})$/.exec(raw);
+  return parsed ? money(Number(parsed[1]), parsed[2]) : raw;
+};
+
 export function YuktiDemo() {
   const [user, setUser] = useState<GitHubUser | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
@@ -396,5 +403,5 @@ function parseProductEvidence(raw: string) {
 
 function MemoryFactRow({ fact, editable, busy, onUpdate }: { fact: ConciergeSnapshot["facts"][number]; editable: boolean; busy: boolean; onUpdate: (path: string, body: Record<string, unknown>) => Promise<unknown> }) {
   const [editing, setEditing] = useState(false); const [value, setValue] = useState(fact.value || fact.fact);
-  return <div className="memory-row"><div className="memory-provenance"><span>{fact.kind}</span><small>{fact.origin} · {fact.source}</small></div>{editing ? <input value={value} onChange={(event) => setValue(event.target.value)} aria-label={`Edit ${fact.kind}`} /> : <p>{fact.value || fact.fact}</p>}<div className="memory-controls">{editable && (editing ? <button onClick={async () => { await onUpdate("/api/concierge/facts/update", { id: fact.id, value }); setEditing(false); }} disabled={busy}>Save</button> : <button onClick={() => setEditing(true)}>Correct</button>)}{editable && <button onClick={() => void onUpdate("/api/concierge/facts/delete", { id: fact.id })} disabled={busy}>Delete</button>}</div></div>;
+  return <div className="memory-row"><div className="memory-provenance"><span>{fact.kind}</span><small>{fact.origin} · {fact.source}</small></div>{editing ? <input value={value} onChange={(event) => setValue(event.target.value)} aria-label={`Edit ${fact.kind}`} /> : <p>{memoryDisplayValue(fact)}</p>}<div className="memory-controls">{editable && (editing ? <button onClick={async () => { await onUpdate("/api/concierge/facts/update", { id: fact.id, value }); setEditing(false); }} disabled={busy}>Save</button> : <button onClick={() => setEditing(true)}>Correct</button>)}{editable && <button onClick={() => void onUpdate("/api/concierge/facts/delete", { id: fact.id })} disabled={busy}>Delete</button>}</div></div>;
 }
