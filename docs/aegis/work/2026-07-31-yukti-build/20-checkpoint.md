@@ -4,7 +4,7 @@ Updated: `2026-07-31`
 
 ## Current todo
 
-Get the user's explicit demo delivery destination, prove the positive Gemini Google Search grounding path, capture the final screenshots and demo video, then publish the Devfolio submission.
+Capture the proven Linq memory, cited live-merchant recommendation, and exact approval path; keep Prava's provider-pending state explicit; then finish the screenshots, demo video, GitHub publication, and Devfolio submission.
 
 ## Active slice
 
