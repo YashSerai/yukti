@@ -93,9 +93,11 @@ export function YuktiDemo() {
       const response = await fetch("/api/concierge/scan", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ send }) });
       const result = await response.json() as { error?: string; state?: string };
       if (!response.ok) throw new Error(result.error ?? "scan_failed");
-      if (result.state === "nothing_due") setConciergeError("No flower reminder is due yet. You can change its cadence below.");
-      if (result.state === "missing_location") setConciergeError("Add the recipient's city or postal code before Yukti searches. Delivery availability depends on the destination.");
+      const notice = result.state === "nothing_due" ? "No flower reminder is due yet. You can change its cadence below."
+        : result.state === "missing_location" ? "Add the recipient's city or postal code before Yukti searches. Delivery availability depends on the destination."
+        : null;
       await loadConcierge();
+      if (notice) setConciergeError(notice);
     } catch { setConciergeError("The live flower catalog is unavailable right now. Yukti did not send a message or create an approval."); }
     finally { setConciergeBusy(false); }
   };
