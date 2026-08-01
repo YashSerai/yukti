@@ -91,7 +91,11 @@ export function YuktiDemo() {
     setConciergeBusy(true); setConciergeError(null);
     try {
       const response = await fetch("/api/concierge/scan", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ send }) });
-      const result = await response.json() as { error?: string; state?: string };
+      const result = await response.json() as { error?: string; reason?: string; state?: string };
+      if (!response.ok && result.error === "grounded_search_unavailable") {
+        setConciergeError(`Google Search could not verify a current option. ${result.reason ?? "No product or approval was created."}`);
+        return;
+      }
       if (!response.ok) throw new Error(result.error ?? "scan_failed");
       const notice = result.state === "nothing_due" ? "No flower reminder is due yet. You can change its cadence below."
         : result.state === "missing_location" ? "Add the recipient's city or postal code before Yukti searches. Delivery availability depends on the destination."

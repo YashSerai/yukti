@@ -183,7 +183,10 @@ async function scanForFlowers(request: Request, env: ConciergeEnv, userId: strin
       personName: rule.person_name, location: location.value, maximumAmountMinor: rule.maximum_amount_minor,
       preferences: preferences.results.map((item) => item.value), product: selected,
     });
-  } catch { return json({ error: "grounded_search_unavailable" }, 502); }
+  } catch (error) {
+    const reason = error instanceof Error ? error.message.replace(/AIza[\w-]+/g, "[redacted]").slice(0, 180) : "unknown_grounding_failure";
+    return json({ error: "grounded_search_unavailable", reason }, 502);
+  }
   const evidence = JSON.stringify({ catalog: "FTD public flowers catalog", deliveryLocation: location.value, deliveryTiming: "as soon as available", preferenceFacts: preferences.results.map((item) => item.value), sensoContentIds: sensoReferences, groundedResearch, ranking: "explicit and Senso preference matches, then lowest starting price", deliveryBoundary: "Merchant must confirm the exact address and delivery date before checkout" });
   await env.DB.prepare(`INSERT INTO product_snapshots (id, user_id, rule_id, merchant, merchant_product_id, title, amount_minor, currency, url, image_url, availability, source_kind, evidence, retrieved_at, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'live_merchant', ?, ?, ?, ?)`)
