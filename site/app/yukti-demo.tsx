@@ -43,6 +43,25 @@ export function YuktiDemo() {
     }).finally(() => setAuthChecking(false));
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
+    const params = new URLSearchParams(window.location.search);
+    const transactionId = params.get("payment") === "returned" ? params.get("transaction") : null;
+    if (!transactionId) return;
+    setPaymentBusy(true); setPaymentError(null);
+    void fetch("/api/prava/sessions/verify", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ transactionId }) })
+      .then(async (response) => {
+        const result = await response.json() as SandboxOutcome & { error?: string };
+        if (!response.ok && response.status !== 202) throw new Error(result.error ?? "verify_failed");
+        setSandboxOutcome(result);
+      })
+      .catch(() => setPaymentError("Prava’s result is not available yet. No purchase was retried."))
+      .finally(() => {
+        setPaymentBusy(false);
+        window.history.replaceState({}, "", window.location.pathname);
+      });
+  }, [user]);
+
   const logout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     setUser(null); reset();

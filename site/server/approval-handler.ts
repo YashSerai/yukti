@@ -223,7 +223,7 @@ async function createPravaSession(request: Request, env: RuntimeEnv, identity: {
       currency: approval.currency,
       merchant: { name: approval.merchant, url: approval.url, countryCode: "CA" },
       item: { id: transactionId, description: approval.title, amountMinor: approval.amount_minor, quantity: 1 },
-      callbackUrl: env.YUKTI_APP_URL ? `${env.YUKTI_APP_URL}/?payment=returned` : undefined,
+      callbackUrl: env.YUKTI_APP_URL ? `${env.YUKTI_APP_URL}/?payment=returned&transaction=${encodeURIComponent(transactionId)}` : undefined,
     });
     await env.DB.prepare(`UPDATE transactions SET prava_session_id = ?, state = 'purchasing', updated_at = ? WHERE id = ?`)
       .bind(session.sessionId, new Date().toISOString(), transactionId).run();
