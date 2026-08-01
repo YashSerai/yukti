@@ -7,7 +7,7 @@ Checked against the published Agentic Commerce Hackathon Builder Handbook on Jul
 - [x] Working public demo: <https://yukti.yashns.chatgpt.site>
 - [ ] Short demo video recorded and uploaded
 - [x] Judge-access link
-- [ ] Repository link added after the scheduled first GitHub push
+- [x] Repository: <https://github.com/YashSerai/yukti>
 - [x] Clear user, problem, and product explanation
 - [x] Clear Prava architecture and transaction-outcome explanation
 - [x] Partner implementation boundaries documented
