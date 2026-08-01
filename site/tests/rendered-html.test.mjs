@@ -15,7 +15,7 @@ test("server-renders the Yukti judge experience", async () => {
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
-  assert.match(html, /<title>Yukti \| Life admin, prepared<\/title>/i);
+  assert.match(html, /<title>Yukti \| Thoughtful gifts, prepared<\/title>/i);
   assert.match(html, /Sarah(?:’|&#x27;|')s birthday/);
   assert.match(html, /Transaction envelope/);
   assert.match(html, /Private by design/);

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Yukti | Life admin, prepared",
-  description: "A consent-first calendar agent that prepares life admin and purchases for your approval.",
+  title: "Yukti | Thoughtful gifts, prepared",
+  description: "A relationship-aware gifting concierge that remembers what matters, finds current options, and asks before every purchase.",
   icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
 };
 
