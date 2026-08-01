@@ -174,6 +174,12 @@ async function createApproval(request: Request, db: D1Database, identity: { id: 
     if (!snapshot) return reply({ error: "product_snapshot_not_found" }, 404);
     if (snapshot.amount_minor > snapshot.maximum_amount_minor) return reply({ error: "product_over_budget" }, 409);
     if (Date.parse(snapshot.retrieved_at) < Date.now() - 24 * 60 * 60_000) return reply({ error: "product_snapshot_stale" }, 409);
+    let productEvidence: { deliveryLocation?: string; groundedResearch?: { citations?: Array<{ url?: string }> } };
+    try { productEvidence = JSON.parse(snapshot.evidence); } catch { return reply({ error: "product_research_incomplete" }, 409); }
+    const citations = productEvidence.groundedResearch?.citations ?? [];
+    if (!productEvidence.deliveryLocation || !citations.some((item) => typeof item.url === "string" && /^https:\/\//.test(item.url))) {
+      return reply({ error: "product_research_incomplete" }, 409);
+    }
     candidateSlug = `live-${snapshot.id}`;
     candidateId = scoped(identity.id, candidateSlug);
     const now = new Date().toISOString();

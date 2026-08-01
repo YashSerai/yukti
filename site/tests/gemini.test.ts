@@ -46,4 +46,23 @@ describe("Gemini Flash adapter", () => {
     await expect(new GeminiFlashClient("key", "gemini-3.6-flash", fetcher).prepareBirthdayBrief()).resolves.toMatchObject({ summary: "Both options fit." });
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
+
+  it("uses Google Search and requires cited product evidence", async () => {
+    const fetcher = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body));
+      expect(body.tools).toEqual([{ type: "google_search" }]);
+      expect(body.input).toContain("Delivery location supplied by the user: Vancouver, BC");
+      return new Response(JSON.stringify({ model: "gemini-3.6-flash", output: [
+        { type: "google_search_call", queries: ["FTD Sweet Pretty Bouquet Vancouver"] },
+        { type: "model_output", content: [{ type: "text", text: "FTD currently lists the bouquet. Confirm the exact address and delivery date with FTD.", annotations: [
+          { type: "url_citation", url: "https://www.ftd.com/product/sweet-pretty-bouquet-prd-b35", title: "FTD" },
+        ] }] },
+      ] }));
+    });
+    const research = await new GeminiFlashClient("key", "gemini-3.6-flash", fetcher as typeof fetch).researchCurrentProduct({
+      personName: "Sarah", location: "Vancouver, BC", maximumAmountMinor: 7000, preferences: ["tulips"],
+      product: { merchantProductId: "b35", merchant: "FTD", title: "Sweet & Pretty Bouquet", amountMinor: 4500, currency: "USD", url: "https://www.ftd.com/product/sweet-pretty-bouquet-prd-b35", imageUrl: null, availability: "Check with merchant", retrievedAt: "2026-07-31T00:00:00.000Z" },
+    });
+    expect(research).toMatchObject({ model: "gemini-3.6-flash", citations: [{ title: "FTD" }] });
+  });
 });

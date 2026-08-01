@@ -3,6 +3,7 @@ import { LinqClient } from "../providers/linq/client";
 import { isAllowedLinqEvent, linqInboundEvent, verifyLinqWebhook } from "../providers/linq/webhook";
 import { fetchFlowerProducts } from "../providers/products/flowers";
 import { SensoClient } from "../providers/senso/client";
+import { GeminiFlashClient } from "../providers/gemini/client";
 import type { RequestIdentity } from "./identity";
 
 export type ConciergeEnv = {
@@ -14,6 +15,8 @@ export type ConciergeEnv = {
   LINQ_WEBHOOK_SECRET?: string;
   YUKTI_OWNER_GITHUB_LOGIN?: string;
   SENSO_API_KEY?: string;
+  GEMINI_API_KEY?: string;
+  GEMINI_MODEL?: string;
 };
 
 const headers = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
@@ -100,14 +103,14 @@ async function connectedSnapshot(db: D1Database, userId: string) {
     db.prepare(`SELECT id, person_id AS personId, fact, kind, value, status, origin, source, confidence, created_at AS createdAt FROM memory_facts WHERE user_id = ? ORDER BY created_at DESC`).bind(userId).all(),
     db.prepare(`SELECT r.id, r.person_id AS personId, p.name AS personName, r.kind, r.cadence_days AS cadenceDays, r.maximum_amount_minor AS maximumAmountMinor, r.currency, r.enabled, r.next_eligible_at AS nextEligibleAt, r.last_prepared_at AS lastPreparedAt FROM proactive_rules r JOIN people p ON p.id = r.person_id WHERE r.user_id = ? ORDER BY r.created_at DESC`).bind(userId).all(),
     db.prepare(`SELECT direction, body, processing_state AS processingState, created_at AS createdAt FROM messages WHERE user_id = ? ORDER BY created_at DESC LIMIT 12`).bind(userId).all(),
-    db.prepare(`SELECT id, rule_id AS ruleId, merchant, title, amount_minor AS amountMinor, currency, url, image_url AS imageUrl, availability, source_kind AS sourceKind, evidence, retrieved_at AS retrievedAt FROM product_snapshots WHERE user_id = ? ORDER BY retrieved_at DESC LIMIT 1`).bind(userId).all(),
+    db.prepare(`SELECT id, rule_id AS ruleId, merchant, title, amount_minor AS amountMinor, currency, url, image_url AS imageUrl, availability, source_kind AS sourceKind, evidence, retrieved_at AS retrievedAt FROM product_snapshots WHERE user_id = ? AND evidence LIKE '%"groundedResearch"%' ORDER BY retrieved_at DESC LIMIT 1`).bind(userId).all(),
   ]);
   return { mode: "connected", people: people.results, facts: facts.results, rules: rules.results, messages: messages.results, products: products.results };
 }
 
 async function createFact(request: Request, db: D1Database, userId: string, now: string) {
   const body = await bodyJson(request); const personName = string(body.personName, 40); const value = string(body.value, 120);
-  const kind = ["relationship", "preference", "budget", "note"].includes(String(body.kind)) ? String(body.kind) : "note";
+  const kind = ["relationship", "preference", "budget", "location", "note"].includes(String(body.kind)) ? String(body.kind) : "note";
   if (!personName || !value) return json({ error: "person_and_value_required" }, 400);
   const personId = await ensurePerson(db, userId, personName, kind === "relationship" ? value : "Someone you care about", now);
   const learned = { personName, kind, value, origin: "explicit", confidence: 100 } as const;
@@ -158,6 +161,8 @@ async function scanForFlowers(request: Request, env: ConciergeEnv, userId: strin
   if (!products.length) return json({ state: "no_product_within_budget" }, 200);
 
   const preferences = await env.DB.prepare(`SELECT value FROM memory_facts WHERE user_id = ? AND person_id = ? AND kind = 'preference' AND status = 'confirmed' ORDER BY updated_at DESC`).bind(userId, rule.person_id).all<{ value: string }>();
+  const location = await env.DB.prepare(`SELECT value FROM memory_facts WHERE user_id = ? AND person_id = ? AND kind = 'location' AND status = 'confirmed' ORDER BY updated_at DESC LIMIT 1`).bind(userId, rule.person_id).first<{ value: string }>();
+  if (!location?.value) return json({ state: "missing_location", personName: rule.person_name }, 200);
   let sensoReferences: string[] = [];
   let sensoWords: string[] = [];
   if (env.SENSO_API_KEY) {
@@ -171,7 +176,15 @@ async function scanForFlowers(request: Request, env: ConciergeEnv, userId: strin
   const preferenceWords = preferences.results.flatMap((item) => item.value.toLowerCase().split(/\W+/)).filter((word) => word.length > 3);
   const ranked = products.map((product) => ({ product, score: preferenceWords.filter((word) => product.title.toLowerCase().includes(word)).length * 2 + sensoWords.filter((word) => product.title.toLowerCase().includes(word)).length })).sort((a, b) => b.score - a.score || a.product.amountMinor - b.product.amountMinor);
   const selected = ranked[0].product; const snapshotId = crypto.randomUUID();
-  const evidence = JSON.stringify({ catalog: "FTD public flowers catalog", preferenceFacts: preferences.results.map((item) => item.value), sensoContentIds: sensoReferences, ranking: "explicit and Senso preference matches, then lowest starting price" });
+  let groundedResearch;
+  try {
+    if (!env.GEMINI_API_KEY) throw new Error("Gemini is not configured");
+    groundedResearch = await new GeminiFlashClient(env.GEMINI_API_KEY, env.GEMINI_MODEL).researchCurrentProduct({
+      personName: rule.person_name, location: location.value, maximumAmountMinor: rule.maximum_amount_minor,
+      preferences: preferences.results.map((item) => item.value), product: selected,
+    });
+  } catch { return json({ error: "grounded_search_unavailable" }, 502); }
+  const evidence = JSON.stringify({ catalog: "FTD public flowers catalog", deliveryLocation: location.value, deliveryTiming: "as soon as available", preferenceFacts: preferences.results.map((item) => item.value), sensoContentIds: sensoReferences, groundedResearch, ranking: "explicit and Senso preference matches, then lowest starting price", deliveryBoundary: "Merchant must confirm the exact address and delivery date before checkout" });
   await env.DB.prepare(`INSERT INTO product_snapshots (id, user_id, rule_id, merchant, merchant_product_id, title, amount_minor, currency, url, image_url, availability, source_kind, evidence, retrieved_at, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'live_merchant', ?, ?, ?, ?)`)
     .bind(snapshotId, userId, rule.id, selected.merchant, selected.merchantProductId, selected.title, selected.amountMinor, selected.currency, selected.url, selected.imageUrl, selected.availability, evidence, selected.retrievedAt, now, now).run();
@@ -196,7 +209,7 @@ async function persistFact(db: D1Database, userId: string, learned: { personName
   const personId = knownPersonId ?? await ensurePerson(db, userId, learned.personName, learned.kind === "relationship" ? learned.value : "Someone you care about", now);
   if (learned.kind === "relationship") await db.prepare(`UPDATE people SET relationship = ?, updated_at = ? WHERE id = ? AND user_id = ?`).bind(learned.value, now, personId, userId).run();
   const existing = await db.prepare(`SELECT id FROM memory_facts WHERE user_id = ? AND person_id = ? AND kind = ? AND value = ?`).bind(userId, personId, learned.kind, learned.value).first<{ id: string }>();
-  const sentence = learned.kind === "relationship" ? `${learned.personName} is your ${learned.value}` : learned.kind === "budget" ? `${learned.personName}'s budget is $${Number(learned.value.split(" ")[0]) / 100}` : `${learned.personName} likes ${learned.value}`;
+  const sentence = learned.kind === "relationship" ? `${learned.personName} is your ${learned.value}` : learned.kind === "budget" ? `${learned.personName}'s budget is $${Number(learned.value.split(" ")[0]) / 100}` : learned.kind === "location" ? `${learned.personName} lives in ${learned.value}` : `${learned.personName} likes ${learned.value}`;
   if (existing) return db.prepare(`UPDATE memory_facts SET status = 'confirmed', origin = ?, source_message_id = ?, source = ?, confidence = ?, updated_at = ? WHERE id = ?`).bind(learned.origin, sourceMessageId, `Linq ${sourceEventId.slice(0, 8)}`, learned.confidence, now, existing.id).run();
   return db.prepare(`INSERT INTO memory_facts (id, user_id, person_id, fact, kind, value, status, origin, source_message_id, source, confidence, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?, ?, ?, ?)`)
     .bind(crypto.randomUUID(), userId, personId, sentence, learned.kind, learned.value, learned.origin, sourceMessageId, `Linq ${sourceEventId.slice(0, 8)}`, learned.confidence, now, now).run();

@@ -14,7 +14,7 @@ Yukti is an iMessage concierge for the people you care about. It learns explicit
 - The default `seeded` mode records approvals but cannot contact Prava.
 - `sandbox` mode can create and revoke Prava sandbox sessions. It cannot create a live charge.
 - Linq webhooks are verified over the raw body, deduplicated by provider event ID, and restricted to the configured owner line and recipient.
-- Recurring flower rules prepare recommendations. They do not create recurring charges, and every product still needs a fresh approval.
+- Recurring flower rules prepare recommendations. A scan requires an explicit delivery location and cited Gemini Google Search evidence. The merchant still confirms the exact address and date. Rules do not create recurring charges, and every product needs a fresh approval.
 
 ## Local development
 

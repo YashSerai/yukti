@@ -19,9 +19,9 @@ Calendar assistants usually remind people that something matters, then leave the
 
 ## Connected owner path
 
-1. Text the Yukti Linq number with an explicit relationship fact, preference, budget, or flower cadence.
+1. Text the Yukti Linq number with an explicit relationship fact, preference, budget, delivery location, or flower cadence.
 2. Open **People** to inspect, correct, or delete what Yukti learned and see its Linq provenance.
-3. Save a flower reminder and run **Find a live flower option**. Yukti retrieves current products from FTD's public catalog and uses saved preferences plus Senso context to rank them.
+3. Save a flower reminder and run **Find a live flower option**. Yukti requires a user-supplied destination, retrieves current products from FTD's public catalog, and asks Gemini 3.6 Flash to check the exact option with Google Search grounding. Search citations are stored with the snapshot; the merchant still confirms the address and delivery date.
 4. Use **Prepare and text me** for the proactive iMessage prompt, or approve the exact live product from the console.
 5. Continue through the same short-lived Prava sandbox boundary. A recurring reminder never becomes an automatic recurring charge.
 

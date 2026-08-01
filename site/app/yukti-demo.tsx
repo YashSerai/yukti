@@ -94,6 +94,7 @@ export function YuktiDemo() {
       const result = await response.json() as { error?: string; state?: string };
       if (!response.ok) throw new Error(result.error ?? "scan_failed");
       if (result.state === "nothing_due") setConciergeError("No flower reminder is due yet. You can change its cadence below.");
+      if (result.state === "missing_location") setConciergeError("Add the recipient's city or postal code before Yukti searches. Delivery availability depends on the destination.");
       await loadConcierge();
     } catch { setConciergeError("The live flower catalog is unavailable right now. Yukti did not send a message or create an approval."); }
     finally { setConciergeBusy(false); }
@@ -355,7 +356,7 @@ function PeopleView({ snapshot, busy, error, authenticated, onReload, onUpdate, 
         </div>
         {connected && <form className="memory-form" onSubmit={addFact}>
           <label>Person<input value={personName} onChange={(event) => setPersonName(event.target.value)} maxLength={40} required /></label>
-          <label>Fact type<select value={kind} onChange={(event) => setKind(event.target.value)}><option value="preference">Preference</option><option value="relationship">Relationship</option><option value="budget">Budget</option><option value="note">Note</option></select></label>
+          <label>Fact type<select value={kind} onChange={(event) => setKind(event.target.value)}><option value="preference">Preference</option><option value="relationship">Relationship</option><option value="budget">Budget</option><option value="location">Delivery location</option><option value="note">Note</option></select></label>
           <label className="fact-value">What should Yukti remember?<input value={value} onChange={(event) => setValue(event.target.value)} placeholder="Loves tulips" maxLength={120} required /></label>
           <button className="primary" disabled={busy}>Save fact</button>
         </form>}
@@ -367,11 +368,24 @@ function PeopleView({ snapshot, busy, error, authenticated, onReload, onUpdate, 
       <form onSubmit={addRule} className="cadence-form"><label>Person<input value={personName} onChange={(event) => setPersonName(event.target.value)} required /></label><label>Every<span><input type="number" min="7" max="365" value={cadence} onChange={(event) => setCadence(Number(event.target.value))} /> days</span></label><label>Stay under<span><input type="number" min="10" max="1000" value={budget} onChange={(event) => setBudget(Number(event.target.value))} /> USD</span></label><button className="secondary" disabled={busy}>Save reminder</button></form>
       <div className="rule-list">{snapshot?.rules.map((rule) => <div key={rule.id}><div><strong>{rule.personName}: flowers every {rule.cadenceDays} days</strong><small>Up to {money(rule.maximumAmountMinor, rule.currency)}. Next scan {new Date(rule.nextEligibleAt).toLocaleDateString()}.</small></div><button onClick={() => void onUpdate("/api/concierge/rules/toggle", { id: rule.id, enabled: !Boolean(rule.enabled) })} disabled={busy}>{rule.enabled ? "Pause" : "Resume"}</button></div>)}</div>
       <div className="scan-actions"><button className="primary" onClick={() => void onScan(false)} disabled={busy || !snapshot?.rules.length}>{busy ? "Checking..." : "Find a live flower option"}</button><button className="send-action" onClick={() => void onScan(true)} disabled={busy || !snapshot?.rules.length}>Prepare and text me</button></div>
-      <div className="real-products">{snapshot?.products.filter((product, index, all) => index === all.findIndex((candidate) => candidate.merchant === product.merchant && candidate.title === product.title && candidate.amountMinor === product.amountMinor)).map((product) => <article key={product.id}>{product.imageUrl && <img src={product.imageUrl} alt="" />}<div><span>{product.merchant} · retrieved {new Date(product.retrievedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span><h3>{product.title}</h3><strong>From {money(product.amountMinor, product.currency)}</strong><p>{product.availability}</p><div className="product-actions"><button onClick={() => void onApproveProduct(product)} disabled={busy}>Approve this exact option</button><a href={product.url} target="_blank" rel="noreferrer">View current merchant page</a></div></div></article>)}</div>
+      <div className="real-products">{snapshot?.products.map((product) => <LiveProductCard key={product.id} product={product} busy={busy} onApprove={onApproveProduct} />)}</div>
     </section>}
 
     {connected && snapshot?.messages.length ? <section className="conversation-log"><h2>Recent Linq conversation</h2>{snapshot.messages.map((message, index) => <div key={`${message.createdAt}-${index}`} className={message.direction}><span>{message.direction === "inbound" ? "You" : "Yukti"}</span><p>{message.body}</p><time>{new Date(message.createdAt).toLocaleString()}</time></div>)}</section> : null}
   </section>;
+}
+
+function LiveProductCard({ product, busy, onApprove }: { product: ConciergeSnapshot["products"][number]; busy: boolean; onApprove: (product: ConciergeSnapshot["products"][number]) => Promise<void> }) {
+  const evidence = parseProductEvidence(product.evidence);
+  return <article>{product.imageUrl && <img src={product.imageUrl} alt="" />}<div><span>{product.merchant} · retrieved {new Date(product.retrievedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span><h3>{product.title}</h3><strong>From {money(product.amountMinor, product.currency)}</strong><p>{product.availability}</p>{evidence && <div className="grounding-note"><small>Google Search checked for {evidence.location}. The merchant still confirms the exact address and delivery date.</small>{evidence.citations.map((citation, index) => <a key={citation.url} href={citation.url} target="_blank" rel="noreferrer">Source {index + 1}: {citation.title}</a>)}</div>}<div className="product-actions"><button onClick={() => void onApprove(product)} disabled={busy}>Approve this exact option</button><a href={product.url} target="_blank" rel="noreferrer">View current merchant page</a></div></div></article>;
+}
+
+function parseProductEvidence(raw: string) {
+  try {
+    const value = JSON.parse(raw) as { deliveryLocation?: string; groundedResearch?: { citations?: Array<{ url: string; title: string }> } };
+    const citations = value.groundedResearch?.citations?.filter((item) => /^https:\/\//.test(item.url)).slice(0, 3) ?? [];
+    return value.deliveryLocation && citations.length ? { location: value.deliveryLocation, citations } : null;
+  } catch { return null; }
 }
 
 function MemoryFactRow({ fact, editable, busy, onUpdate }: { fact: ConciergeSnapshot["facts"][number]; editable: boolean; busy: boolean; onUpdate: (path: string, body: Record<string, unknown>) => Promise<unknown> }) {

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { fetchWithSingleRetry } from "../retry";
+import type { FlowerProduct } from "../products/flowers";
 
 const preparationSchema = z.object({
   summary: z.string().min(1).max(240),
@@ -23,6 +24,14 @@ export type PreparationBrief = z.infer<typeof preparationSchema> & {
   model: string;
   generatedAt: string;
   usage: { promptTokens: number; outputTokens: number };
+};
+
+export type GroundedProductResearch = {
+  summary: string;
+  citations: Array<{ url: string; title: string }>;
+  searchQueries: string[];
+  model: string;
+  generatedAt: string;
 };
 
 export class GeminiFlashClient {
@@ -92,4 +101,41 @@ export class GeminiFlashClient {
       },
     };
   }
+
+  async researchCurrentProduct(input: { personName: string; location: string; maximumAmountMinor: number; preferences: string[]; product: FlowerProduct }): Promise<GroundedProductResearch> {
+    const prompt = [
+      "You are checking one current gift option for Yukti. Use Google Search before answering.",
+      `Today is ${new Date().toISOString().slice(0, 10)}.`,
+      `Recipient: ${input.personName}. Delivery location supplied by the user: ${input.location}.`,
+      `Budget: USD ${(input.maximumAmountMinor / 100).toFixed(2)}. Preferences: ${input.preferences.join(", ") || "none supplied"}.`,
+      `Candidate: ${input.product.title} from ${input.product.merchant}, listed from USD ${(input.product.amountMinor / 100).toFixed(2)} at ${input.product.url}.`,
+      "Check current public web evidence for the product, merchant, and destination relevance.",
+      "Do not claim that a specific address or date is deliverable unless a cited merchant source says so. Never claim approval, purchase, or checkout completion.",
+      "Reply in at most three short sentences. Say what is current, what fits, and what the merchant still needs to confirm.",
+    ].join("\n");
+    const endpoint = "https://generativelanguage.googleapis.com/v1beta/interactions";
+    const response = await fetchWithSingleRetry(this.fetcher, endpoint, () => ({
+      method: "POST",
+      signal: AbortSignal.timeout(25_000),
+      headers: { "content-type": "application/json", "x-goog-api-key": this.apiKey },
+      body: JSON.stringify({ model: this.model, input: prompt, tools: [{ type: "google_search" }] }),
+    }));
+    if (!response.ok) throw new Error(`Gemini grounded search failed with status ${response.status}`);
+    return extractGroundedProductResearch(await response.json(), this.model);
+  }
 }
+
+export function extractGroundedProductResearch(payload: unknown, fallbackModel: string): GroundedProductResearch {
+  const root = record(payload); const outputs = array(root.output ?? root.outputs);
+  const textParts = outputs.flatMap((step) => array(record(step).content)).filter((part) => record(part).type === "text");
+  const summary = textParts.map((part) => String(record(part).text ?? "")).join(" ").trim().slice(0, 800);
+  const citations = textParts.flatMap((part) => array(record(part).annotations)).filter((item) => record(item).type === "url_citation")
+    .map((item) => ({ url: String(record(item).url ?? ""), title: String(record(item).title ?? "Source") }))
+    .filter((item, index, all) => /^https:\/\//.test(item.url) && all.findIndex((candidate) => candidate.url === item.url) === index).slice(0, 6);
+  const searchQueries = outputs.filter((step) => record(step).type === "google_search_call").flatMap((step) => array(record(step).queries).map(String)).slice(0, 6);
+  if (!summary || !citations.length) throw new Error("Gemini returned no grounded product evidence");
+  return { summary, citations, searchQueries, model: String(root.model ?? root.modelVersion ?? fallbackModel), generatedAt: new Date().toISOString() };
+}
+
+function record(value: unknown): Record<string, unknown> { return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}; }
+function array(value: unknown): unknown[] { return Array.isArray(value) ? value : []; }

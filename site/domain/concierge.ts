@@ -1,6 +1,6 @@
 export type LearnedFact = {
   personName: string;
-  kind: "relationship" | "preference" | "budget";
+  kind: "relationship" | "preference" | "budget" | "location";
   value: string;
   origin: "explicit";
   confidence: number;
@@ -25,6 +25,9 @@ export function parseConciergeMessage(body: string): ParsedConciergeMessage {
 
   const budget = new RegExp(`(?:budget(?: for)? ${name}|${name}(?:'s)? budget)(?: is|:)? \\$?(\\d{1,4})`, "i").exec(text);
   if (budget) facts.push(fact(capitalize(budget[1] || budget[2]), "budget", `${Number(budget[3]) * 100} USD`));
+
+  const location = new RegExp(`${name} (?:lives|is located) in ([^.!?]{2,80})`, "i").exec(text);
+  if (location) facts.push(fact(capitalize(location[1]), "location", cleanPreference(location[2])));
 
   const recurring = new RegExp(`(?:get|send|buy) ${name} flowers every (week|month|(?:\\d{1,2}) weeks?)`, "i").exec(text);
   const amount = /(?:under|budget(?: is| of)?|up to) \$?(\d{1,4})/i.exec(text);

@@ -16,6 +16,12 @@ describe("concierge memory parsing", () => {
     expect(conciergeReply(parsed)).toContain("ask before every purchase");
   });
 
+  it("stores an explicit delivery location without inferring one", () => {
+    expect(parseConciergeMessage("Sarah lives in Vancouver, BC.").facts).toContainEqual({
+      personName: "Sarah", kind: "location", value: "Vancouver, BC", origin: "explicit", confidence: 100,
+    });
+  });
+
   it("honors opt-out and quiet hours", () => {
     expect(parseConciergeMessage("STOP").optOut).toBe(true);
     const rule = { enabled: true, nextEligibleAt: "2026-07-01T00:00:00.000Z", quietStartHour: 21, quietEndHour: 8 };
