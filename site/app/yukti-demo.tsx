@@ -48,7 +48,6 @@ export function YuktiDemo() {
     const params = new URLSearchParams(window.location.search);
     const transactionId = params.get("payment") === "returned" ? params.get("transaction") : null;
     if (!transactionId) return;
-    setPaymentBusy(true); setPaymentError(null);
     void fetch("/api/prava/sessions/verify", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ transactionId }) })
       .then(async (response) => {
         const result = await response.json() as SandboxOutcome & { error?: string };
