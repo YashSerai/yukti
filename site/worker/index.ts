@@ -14,6 +14,9 @@ interface Env {
   SENSO_API_KEY?: string;
   LINQ_API_TOKEN?: string;
   LINQ_PHONE_NUMBER?: string;
+  LINQ_OWNER_PHONE?: string;
+  LINQ_WEBHOOK_SECRET?: string;
+  YUKTI_OWNER_GITHUB_LOGIN?: string;
   COMPOSIO_API_KEY?: string;
   COMPOSIO_USER_ID?: string;
   GITHUB_CLIENT_ID?: string;

@@ -19,7 +19,9 @@ export const events = sqliteTable("events", {
 });
 export const memoryFacts = sqliteTable("memory_facts", {
   id: text("id").primaryKey(), userId: text("user_id").notNull().references(() => users.id), personId: text("person_id").references(() => people.id),
-  fact: text("fact").notNull(), source: text("source").notNull(), confidence: integer("confidence").notNull(), ...timestamps,
+  fact: text("fact").notNull(), kind: text("kind").notNull().default("note"), value: text("value"),
+  status: text("status").notNull().default("confirmed"), origin: text("origin").notNull().default("seeded"),
+  sourceMessageId: text("source_message_id"), source: text("source").notNull(), confidence: integer("confidence").notNull(), ...timestamps,
 });
 export const preparationPlans = sqliteTable("preparation_plans", {
   id: text("id").primaryKey(), eventId: text("event_id").notNull().references(() => events.id), state: text("state").notNull(),
@@ -58,4 +60,34 @@ export const webSessions = sqliteTable("web_sessions", {
 });
 export const rateLimits = sqliteTable("rate_limits", {
   key: text("key").primaryKey(), attemptCount: integer("attempt_count").notNull(), windowExpiresAt: integer("window_expires_at").notNull(),
+});
+
+export const conciergeProfiles = sqliteTable("concierge_profiles", {
+  userId: text("user_id").primaryKey().references(() => users.id), phoneE164: text("phone_e164").notNull().unique(),
+  proactiveEnabled: integer("proactive_enabled", { mode: "boolean" }).notNull().default(true),
+  quietStartHour: integer("quiet_start_hour").notNull().default(21), quietEndHour: integer("quiet_end_hour").notNull().default(8), ...timestamps,
+});
+export const conversations = sqliteTable("conversations", {
+  id: text("id").primaryKey(), userId: text("user_id").notNull().references(() => users.id), provider: text("provider").notNull(),
+  providerChatId: text("provider_chat_id").notNull().unique(), participantE164: text("participant_e164").notNull(), status: text("status").notNull(), ...timestamps,
+});
+export const messages = sqliteTable("messages", {
+  id: text("id").primaryKey(), userId: text("user_id").notNull().references(() => users.id), conversationId: text("conversation_id").notNull().references(() => conversations.id),
+  providerEventId: text("provider_event_id").unique(), providerMessageId: text("provider_message_id"), direction: text("direction").notNull(),
+  body: text("body").notNull(), processingState: text("processing_state").notNull(), ...timestamps,
+});
+export const webhookReceipts = sqliteTable("webhook_receipts", {
+  eventId: text("event_id").primaryKey(), provider: text("provider").notNull(), eventType: text("event_type").notNull(), receivedAt: text("received_at").notNull(),
+});
+export const proactiveRules = sqliteTable("proactive_rules", {
+  id: text("id").primaryKey(), userId: text("user_id").notNull().references(() => users.id), personId: text("person_id").notNull().references(() => people.id),
+  kind: text("kind").notNull(), cadenceDays: integer("cadence_days").notNull(), maximumAmountMinor: integer("maximum_amount_minor").notNull(),
+  currency: text("currency").notNull(), enabled: integer("enabled", { mode: "boolean" }).notNull().default(true), nextEligibleAt: text("next_eligible_at").notNull(),
+  lastPreparedAt: text("last_prepared_at"), ...timestamps,
+});
+export const productSnapshots = sqliteTable("product_snapshots", {
+  id: text("id").primaryKey(), userId: text("user_id").notNull().references(() => users.id), ruleId: text("rule_id").references(() => proactiveRules.id),
+  merchant: text("merchant").notNull(), merchantProductId: text("merchant_product_id").notNull(), title: text("title").notNull(),
+  amountMinor: integer("amount_minor").notNull(), currency: text("currency").notNull(), url: text("url").notNull(), imageUrl: text("image_url"),
+  availability: text("availability").notNull(), sourceKind: text("source_kind").notNull(), evidence: text("evidence").notNull(), retrievedAt: text("retrieved_at").notNull(), ...timestamps,
 });

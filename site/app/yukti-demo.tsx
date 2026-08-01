@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { seedAudit, seedCandidates, seedEvents } from "../lib/seed";
 
 type View = "Today" | "People" | "Wallet" | "Audit";
@@ -9,6 +9,14 @@ type SandboxOutcome = { state: "pending" | "sandbox_declined" | "completed" | "f
 type PreparationBrief = { summary: string; candidateReasons: Array<{ candidateId: string; reason: string }>; caution: string; model: string };
 type ProviderStatus = { checkedAt: string; providers: Record<string, { state: string; detail?: string; model?: string }> };
 type GitHubUser = { login: string; displayName: string };
+type ConciergeSnapshot = {
+  mode: "connected" | "seeded";
+  people: Array<{ id: string; name: string; relationship: string; updatedAt?: string }>;
+  facts: Array<{ id: string; personId: string; fact: string; kind: string; value: string; status: string; origin: string; source: string; confidence: number; createdAt?: string }>;
+  rules: Array<{ id: string; personId: string; personName: string; kind: string; cadenceDays: number; maximumAmountMinor: number; currency: string; enabled: number | boolean; nextEligibleAt: string; lastPreparedAt?: string | null }>;
+  messages: Array<{ direction: string; body: string; processingState: string; createdAt: string }>;
+  products: Array<{ id: string; merchant: string; title: string; amountMinor: number; currency: string; url: string; imageUrl?: string | null; availability: string; sourceKind: string; evidence: string; retrievedAt: string }>;
+};
 
 const money = (amount: number, currency: string) => new Intl.NumberFormat("en-CA", { style: "currency", currency }).format(amount / 100);
 
@@ -18,6 +26,7 @@ export function YuktiDemo() {
   const [view, setView] = useState<View>("Today");
   const [selectedEvent, setSelectedEvent] = useState<string>(seedEvents[0].id);
   const [selectedCandidate, setSelectedCandidate] = useState<string>(seedCandidates[0].id);
+  const [approvedProduct, setApprovedProduct] = useState<{ id: string; merchant: string; title: string; price: number; currency: string } | null>(null);
   const [reviewing, setReviewing] = useState(false);
   const [approved, setApproved] = useState(false);
   const [approvalId, setApprovalId] = useState<string | null>(null);
@@ -33,7 +42,10 @@ export function YuktiDemo() {
   const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
   const [statusBusy, setStatusBusy] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
-  const candidate = seedCandidates.find((item) => item.id === selectedCandidate) ?? seedCandidates[0];
+  const [concierge, setConcierge] = useState<ConciergeSnapshot | null>(null);
+  const [conciergeBusy, setConciergeBusy] = useState(false);
+  const [conciergeError, setConciergeError] = useState<string | null>(null);
+  const candidate = approvedProduct ?? seedCandidates.find((item) => item.id === selectedCandidate) ?? seedCandidates[0];
 
   useEffect(() => {
     void fetch("/api/me", { cache: "no-store" }).then(async (response) => {
@@ -42,6 +54,50 @@ export function YuktiDemo() {
       if (result.user) setUser(result.user);
     }).finally(() => setAuthChecking(false));
   }, []);
+
+  const loadConcierge = useCallback(async () => {
+    setConciergeBusy(true); setConciergeError(null);
+    try {
+      const response = await fetch("/api/concierge", { cache: "no-store" });
+      const result = await response.json() as ConciergeSnapshot & { error?: string };
+      if (!response.ok || !result.mode) throw new Error(result.error ?? "memory_unavailable");
+      setConcierge(result);
+    } catch { setConciergeError("Yukti could not load relationship memory."); }
+    finally { setConciergeBusy(false); }
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    void fetch("/api/concierge", { cache: "no-store" }).then(async (response) => {
+      const result = await response.json() as ConciergeSnapshot & { error?: string };
+      if (!response.ok || !result.mode) throw new Error(result.error ?? "memory_unavailable");
+      setConcierge(result);
+    }).catch(() => setConciergeError("Yukti could not load relationship memory."));
+  }, [user]);
+
+  const updateConcierge = async (path: string, body: Record<string, unknown>) => {
+    setConciergeBusy(true); setConciergeError(null);
+    try {
+      const response = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "update_failed");
+      await loadConcierge();
+      return result;
+    } catch { setConciergeError("That change was not saved. Nothing else was changed."); return null; }
+    finally { setConciergeBusy(false); }
+  };
+
+  const scanFlowers = async (send: boolean) => {
+    setConciergeBusy(true); setConciergeError(null);
+    try {
+      const response = await fetch("/api/concierge/scan", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ send }) });
+      const result = await response.json() as { error?: string; state?: string };
+      if (!response.ok) throw new Error(result.error ?? "scan_failed");
+      if (result.state === "nothing_due") setConciergeError("No flower reminder is due yet. You can change its cadence below.");
+      await loadConcierge();
+    } catch { setConciergeError("The live flower catalog is unavailable right now. Yukti did not send a message or create an approval."); }
+    finally { setConciergeBusy(false); }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -68,7 +124,7 @@ export function YuktiDemo() {
 
   const reset = () => {
     if (sandboxSession) return;
-    setView("Today"); setSelectedEvent(seedEvents[0].id); setSelectedCandidate(seedCandidates[0].id); setReviewing(false); setApproved(false); setApprovalId(null); setApprovalError(null); setPaymentError(null); setSandboxOutcome(null); setBrief(null); setBriefError(null);
+    setView("Today"); setSelectedEvent(seedEvents[0].id); setSelectedCandidate(seedCandidates[0].id); setApprovedProduct(null); setReviewing(false); setApproved(false); setApprovalId(null); setApprovalError(null); setPaymentError(null); setSandboxOutcome(null); setBrief(null); setBriefError(null);
   };
 
   const checkProviders = async () => {
@@ -155,6 +211,18 @@ export function YuktiDemo() {
     }
   };
 
+  const approveProduct = async (product: ConciergeSnapshot["products"][number]) => {
+    setApprovalBusy(true); setApprovalError(null);
+    try {
+      const response = await fetch("/api/approvals", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ productSnapshotId: product.id }) });
+      const result = await response.json() as { approval?: { id: string }; error?: string };
+      if (!response.ok || !result.approval) throw new Error(result.error ?? "approval_failed");
+      setApprovedProduct({ id: `live-${product.id}`, merchant: product.merchant, title: product.title, price: product.amountMinor, currency: product.currency });
+      setApprovalId(result.approval.id); setApproved(true); setView("Today"); setSelectedEvent("evt-sarah");
+    } catch { setConciergeError("That live product could not be approved. Refresh the merchant result and try again."); }
+    finally { setApprovalBusy(false); }
+  };
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -168,7 +236,7 @@ export function YuktiDemo() {
           : <a className="auth-control sign-in" href="/api/auth/github/start?return_to=/">{authChecking ? "Checking sign-in…" : "Sign in with GitHub"}</a>}
       </header>
 
-      <div className="demo-strip"><span>Seeded judge demo</span><p>Recommendations are fixtures. No live purchase has been attempted.</p><button onClick={reset} disabled={Boolean(sandboxSession)} title={sandboxSession ? "Cancel the open Prava session before resetting" : undefined}>Reset</button></div>
+      <div className="demo-strip"><span>{concierge?.mode === "connected" ? "Connected owner" : "Seeded judge demo"}</span><p>{concierge?.mode === "connected" ? "Linq memory and product scans are live. Every purchase still waits for approval." : "Birthday recommendations are fixtures. No live purchase has been attempted."}</p><button onClick={reset} disabled={Boolean(sandboxSession)} title={sandboxSession ? "Cancel the open Prava session before resetting" : undefined}>Reset</button></div>
       {!authChecking && !user && <div className="auth-banner"><div><strong>Explore freely. Sign in only to run sponsor integrations.</strong><p>GitHub identity protects the shared sandbox keys. Yukti requests no repository or email access.</p></div><a href="/api/auth/github/start?return_to=/">Continue with GitHub</a></div>}
 
       {view === "Today" ? (
@@ -197,7 +265,7 @@ export function YuktiDemo() {
                 {briefError && <p className="inline-error" role="alert">{briefError}</p>}
                 <div className="candidate-grid">
                   {seedCandidates.map((item, index) => (
-                    <button key={item.id} disabled={Boolean(sandboxSession)} className={`candidate-card ${selectedCandidate === item.id ? "chosen" : ""}`} onClick={() => { setSelectedCandidate(item.id); setApproved(false); setApprovalId(null); setApprovalError(null); setPaymentError(null); }}>
+                    <button key={item.id} disabled={Boolean(sandboxSession)} className={`candidate-card ${!approvedProduct && selectedCandidate === item.id ? "chosen" : ""}`} onClick={() => { setApprovedProduct(null); setSelectedCandidate(item.id); setApproved(false); setApprovalId(null); setApprovalError(null); setPaymentError(null); }}>
                       <div className={`object-study study-${index + 1}`} aria-hidden="true"><span /><i /></div>
                       <span className="merchant">{item.merchant}</span><h3>{item.title}</h3><p>{item.reason}</p>
                       {brief && <p className="model-reason">{brief.candidateReasons.find((reason) => reason.candidateId === item.id)?.reason}</p>}
@@ -228,7 +296,8 @@ export function YuktiDemo() {
             )}
           </article>
         </section>
-      ) : <SecondaryView view={view} providerStatus={providerStatus} statusBusy={statusBusy} statusError={statusError} authenticated={Boolean(user)} onCheckProviders={checkProviders} />}
+      ) : <SecondaryView view={view} providerStatus={providerStatus} statusBusy={statusBusy} statusError={statusError} authenticated={Boolean(user)} onCheckProviders={checkProviders}
+        concierge={concierge} conciergeBusy={conciergeBusy} conciergeError={conciergeError} onReloadConcierge={loadConcierge} onUpdateConcierge={updateConcierge} onScanFlowers={scanFlowers} onApproveProduct={approveProduct} />}
 
       {reviewing && (
         <div className="modal-backdrop" role="presentation" onMouseDown={() => setReviewing(false)}>
@@ -252,8 +321,60 @@ function EmptyEvent({ eventId }: { eventId: string }) {
   return <div className="empty-event"><span className="large-mark">{passport ? "12" : "15"}</span><div className="eyebrow brass">{passport ? "Needs one answer" : "Watching"}</div><h2>{passport ? "Passport renewal needs your travel date." : "Nothing to do yet."}</h2><p>{passport ? "Yukti can prepare the renewal checklist after you confirm whether international travel is booked in the next six months." : "Yukti will surface the dentist follow-up if a form, payment, or calendar decision appears."}</p><p className="page-note">{passport ? "Travel detail collection is outside this transaction demo." : "No action is available until the follow-up becomes relevant."}</p></div>;
 }
 
-function SecondaryView({ view, providerStatus, statusBusy, statusError, authenticated, onCheckProviders }: { view: Exclude<View, "Today">; providerStatus: ProviderStatus | null; statusBusy: boolean; statusError: string | null; authenticated: boolean; onCheckProviders: () => void }) {
-  if (view === "People") return <section className="secondary-page"><div className="eyebrow">People</div><h1>Memory you can inspect.</h1><div className="person-card"><span className="avatar large">S</span><div><h2>Sarah</h2><p>Friend · 3 saved facts · all seeded</p></div><span className="fixture-label">Read-only fixture</span></div><p className="page-note">Jasmine tea · taking a ceramics class · prefers useful gifts</p></section>;
+function SecondaryView({ view, providerStatus, statusBusy, statusError, authenticated, onCheckProviders, concierge, conciergeBusy, conciergeError, onReloadConcierge, onUpdateConcierge, onScanFlowers, onApproveProduct }: { view: Exclude<View, "Today">; providerStatus: ProviderStatus | null; statusBusy: boolean; statusError: string | null; authenticated: boolean; onCheckProviders: () => void; concierge: ConciergeSnapshot | null; conciergeBusy: boolean; conciergeError: string | null; onReloadConcierge: () => Promise<void>; onUpdateConcierge: (path: string, body: Record<string, unknown>) => Promise<unknown>; onScanFlowers: (send: boolean) => Promise<void>; onApproveProduct: (product: ConciergeSnapshot["products"][number]) => Promise<void> }) {
+  if (view === "People") return <PeopleView snapshot={concierge} busy={conciergeBusy} error={conciergeError} authenticated={authenticated} onReload={onReloadConcierge} onUpdate={onUpdateConcierge} onScan={onScanFlowers} onApproveProduct={onApproveProduct} />;
   if (view === "Wallet") return <section className="secondary-page"><div className="eyebrow">Wallet</div><h1>No open transactions.</h1><div className="ledger-zero"><strong>$0.00</strong><span>spent through this seeded demo</span></div><p className="page-note">Yukti creates short-lived, purchase-scoped approval envelopes. A real Prava credential is requested only after approval.</p></section>;
   return <section className="secondary-page"><div className="eyebrow">Audit</div><h1>Consequences, recorded.</h1><div className="connection-check"><div><strong>Provider readiness</strong><p>Checks configuration and read-only health. It does not send a message or start a payment.</p></div><button className="secondary" onClick={onCheckProviders} disabled={statusBusy || !authenticated}>{statusBusy ? "Checking…" : authenticated ? "Check connections" : "Sign in to check"}</button></div>{statusError && <p className="inline-error" role="alert">{statusError}</p>}{providerStatus && <div className="provider-grid" aria-live="polite">{Object.entries(providerStatus.providers).map(([name, status]) => <div key={name}><span>{name}</span><strong>{status.state.replaceAll("_", " ")}</strong>{status.detail && <small>{status.detail}</small>}</div>)}</div>}<div className="audit-list">{seedAudit.map((item) => <div key={item.time + item.title}><time>{item.time}</time><span><strong>{item.title}</strong><small>{item.detail}</small></span></div>)}</div></section>;
+}
+
+function PeopleView({ snapshot, busy, error, authenticated, onReload, onUpdate, onScan, onApproveProduct }: { snapshot: ConciergeSnapshot | null; busy: boolean; error: string | null; authenticated: boolean; onReload: () => Promise<void>; onUpdate: (path: string, body: Record<string, unknown>) => Promise<unknown>; onScan: (send: boolean) => Promise<void>; onApproveProduct: (product: ConciergeSnapshot["products"][number]) => Promise<void> }) {
+  const [personName, setPersonName] = useState("Sarah");
+  const [kind, setKind] = useState("preference");
+  const [value, setValue] = useState("");
+  const [cadence, setCadence] = useState(28);
+  const [budget, setBudget] = useState(75);
+  const connected = snapshot?.mode === "connected";
+  const addFact = async (event: React.FormEvent) => { event.preventDefault(); await onUpdate("/api/concierge/facts", { personName, kind, value }); setValue(""); };
+  const addRule = async (event: React.FormEvent) => { event.preventDefault(); await onUpdate("/api/concierge/rules", { personName, cadenceDays: cadence, maximumAmountMinor: budget * 100 }); };
+
+  return <section className="secondary-page people-page">
+    <div className="people-heading"><div><div className="eyebrow">People</div><h1>What Yukti remembers.</h1></div><p>Every fact keeps its source. Correct it, remove it, or stop reminders without opening iMessage.</p></div>
+    {!authenticated && <p className="inline-error">Sign in with GitHub to open the private relationship ledger.</p>}
+    {error && <p className="inline-error" role="alert">{error}</p>}
+    {busy && !snapshot && <p className="page-note" role="status">Loading relationship memory...</p>}
+    {snapshot && <div className="relationship-ledger">
+      <aside className="people-rail" aria-label="People in memory">
+        {snapshot.people.map((person) => <button type="button" key={person.id} onClick={() => setPersonName(person.name)} className={personName.toLowerCase() === person.name.toLowerCase() ? "active-person" : ""}><span>{person.name.slice(0, 1)}</span><strong>{person.name}</strong><small>{person.relationship}</small></button>)}
+        {!snapshot.people.length && <p>No one saved yet. Add the first fact or text Yukti.</p>}
+      </aside>
+      <div className="memory-sheet">
+        <div className="memory-sheet-head"><div><h2>{personName}</h2><p>{connected ? "Connected memory" : "Seeded judge memory"}</p></div><button className="secondary" onClick={() => void onReload()} disabled={busy}>Refresh</button></div>
+        <div className="fact-list">
+          {snapshot.facts.filter((fact) => snapshot.people.find((person) => person.id === fact.personId)?.name.toLowerCase() === personName.toLowerCase()).map((fact) => <MemoryFactRow key={fact.id} fact={fact} editable={connected} busy={busy} onUpdate={onUpdate} />)}
+          {!snapshot.facts.length && <p className="memory-empty">Text Yukti something like &quot;Sarah loves tulips&quot; or add a fact below.</p>}
+        </div>
+        {connected && <form className="memory-form" onSubmit={addFact}>
+          <label>Person<input value={personName} onChange={(event) => setPersonName(event.target.value)} maxLength={40} required /></label>
+          <label>Fact type<select value={kind} onChange={(event) => setKind(event.target.value)}><option value="preference">Preference</option><option value="relationship">Relationship</option><option value="budget">Budget</option><option value="note">Note</option></select></label>
+          <label className="fact-value">What should Yukti remember?<input value={value} onChange={(event) => setValue(event.target.value)} placeholder="Loves tulips" maxLength={120} required /></label>
+          <button className="primary" disabled={busy}>Save fact</button>
+        </form>}
+      </div>
+    </div>}
+
+    {connected && <section className="proactive-workbench">
+      <div className="cadence-copy"><h2>Flowers, prepared on your cadence.</h2><p>Yukti finds a current option and asks first. A recurring reminder never becomes a recurring charge.</p></div>
+      <form onSubmit={addRule} className="cadence-form"><label>Person<input value={personName} onChange={(event) => setPersonName(event.target.value)} required /></label><label>Every<span><input type="number" min="7" max="365" value={cadence} onChange={(event) => setCadence(Number(event.target.value))} /> days</span></label><label>Stay under<span><input type="number" min="10" max="1000" value={budget} onChange={(event) => setBudget(Number(event.target.value))} /> USD</span></label><button className="secondary" disabled={busy}>Save reminder</button></form>
+      <div className="rule-list">{snapshot?.rules.map((rule) => <div key={rule.id}><div><strong>{rule.personName}: flowers every {rule.cadenceDays} days</strong><small>Up to {money(rule.maximumAmountMinor, rule.currency)}. Next scan {new Date(rule.nextEligibleAt).toLocaleDateString()}.</small></div><button onClick={() => void onUpdate("/api/concierge/rules/toggle", { id: rule.id, enabled: !Boolean(rule.enabled) })} disabled={busy}>{rule.enabled ? "Pause" : "Resume"}</button></div>)}</div>
+      <div className="scan-actions"><button className="primary" onClick={() => void onScan(false)} disabled={busy || !snapshot?.rules.length}>{busy ? "Checking..." : "Find a live flower option"}</button><button className="send-action" onClick={() => void onScan(true)} disabled={busy || !snapshot?.rules.length}>Prepare and text me</button></div>
+      <div className="real-products">{snapshot?.products.map((product) => <article key={product.id}>{product.imageUrl && <img src={product.imageUrl} alt="" />}<div><span>{product.merchant} · retrieved {new Date(product.retrievedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span><h3>{product.title}</h3><strong>From {money(product.amountMinor, product.currency)}</strong><p>{product.availability}</p><div className="product-actions"><button onClick={() => void onApproveProduct(product)} disabled={busy}>Approve this exact option</button><a href={product.url} target="_blank" rel="noreferrer">View current merchant page</a></div></div></article>)}</div>
+    </section>}
+
+    {connected && snapshot?.messages.length ? <section className="conversation-log"><h2>Recent Linq conversation</h2>{snapshot.messages.map((message, index) => <div key={`${message.createdAt}-${index}`} className={message.direction}><span>{message.direction === "inbound" ? "You" : "Yukti"}</span><p>{message.body}</p><time>{new Date(message.createdAt).toLocaleString()}</time></div>)}</section> : null}
+  </section>;
+}
+
+function MemoryFactRow({ fact, editable, busy, onUpdate }: { fact: ConciergeSnapshot["facts"][number]; editable: boolean; busy: boolean; onUpdate: (path: string, body: Record<string, unknown>) => Promise<unknown> }) {
+  const [editing, setEditing] = useState(false); const [value, setValue] = useState(fact.value || fact.fact);
+  return <div className="memory-row"><div className="memory-provenance"><span>{fact.kind}</span><small>{fact.origin} · {fact.source}</small></div>{editing ? <input value={value} onChange={(event) => setValue(event.target.value)} aria-label={`Edit ${fact.kind}`} /> : <p>{fact.value || fact.fact}</p>}<div className="memory-controls">{editable && (editing ? <button onClick={async () => { await onUpdate("/api/concierge/facts/update", { id: fact.id, value }); setEditing(false); }} disabled={busy}>Save</button> : <button onClick={() => setEditing(true)}>Correct</button>)}{editable && <button onClick={() => void onUpdate("/api/concierge/facts/delete", { id: fact.id })} disabled={busy}>Delete</button>}</div></div>;
 }

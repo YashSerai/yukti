@@ -1,6 +1,6 @@
 # Yukti
 
-Yukti is a life-admin agent that prepares decisions and stops at the spend boundary. The judge demo turns a remembered birthday preference into two explainable gift options, records one exact approval, and opens a merchant- and amount-scoped Prava sandbox checkout.
+Yukti is an iMessage concierge that remembers the people you care about and stops at the spend boundary. Text it who Sarah is, what she likes, and the budget you prefer. Yukti keeps those facts editable, prepares a current flower option when a reminder is due, and turns the chosen item into a merchant- and amount-scoped Prava sandbox checkout.
 
 Live demo: <https://yukti.yashns.chatgpt.site>
 
@@ -17,6 +17,14 @@ Calendar assistants usually remind people that something matters, then leave the
 5. Create the Prava sandbox session and open its secure checkout.
 6. Complete the hosted test-card flow, then use **Verify sandbox result** in Yukti. Scoped payment credentials remain server-side and are never returned to the browser or stored.
 
+## Connected owner path
+
+1. Text the Yukti Linq number with an explicit relationship fact, preference, budget, or flower cadence.
+2. Open **People** to inspect, correct, or delete what Yukti learned and see its Linq provenance.
+3. Save a flower reminder and run **Find a live flower option**. Yukti retrieves current products from FTD's public catalog and uses saved preferences plus Senso context to rank them.
+4. Use **Prepare and text me** for the proactive iMessage prompt, or approve the exact live product from the console.
+5. Continue through the same short-lived Prava sandbox boundary. A recurring reminder never becomes an automatic recurring charge.
+
 The public experience is deliberately seeded. Product recommendations, delivery claims, and personal facts are fixtures unless the interface explicitly labels a connected source.
 
 ## Architecture and controls
@@ -28,7 +36,7 @@ The public experience is deliberately seeded. Product recommendations, delivery 
 - GitHub OAuth with PKCE, single-use state, hashed server sessions, and no repository or email scope
 - Same-origin mutation checks, per-user and global provider quotas, provider timeouts, one bounded 502/503/504 retry, redacted errors, and secret-only runtime configuration
 
-Composio Google Calendar and Linq are connected/readiness-checked but are not presented as completed user workflows. The shared sponsor identities are intentionally not exposed as public multi-user data or messaging surfaces.
+The connected Linq and relationship-memory workflow is available only to the mapped owner identity. Public judges receive the seeded view and cannot access the owner's phone, messages, memory, reminders, or shared Composio Calendar connection.
 
 ## Local verification
 
@@ -51,4 +59,3 @@ Runtime credentials belong in ignored local environment files or Sites secrets. 
 - [Real versus simulated](docs/real-versus-simulated.md)
 - [Submission copy](SUBMISSION.md)
 - [Architecture decision](docs/adr/0001-hosting-boundary.md)
-

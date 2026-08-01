@@ -7,6 +7,7 @@ import { ComposioClient } from "../providers/composio/client";
 import { identityFromRequest } from "./identity";
 import { beginGitHubLogin, finishGitHubLogin, logoutGitHub, sha256 } from "./github-auth";
 import { consumeRateLimit, guardProviderUse, RateLimitError, requireSameOrigin } from "./rate-limit";
+import { handleConciergeRequest, handleLinqWebhook } from "./concierge-handler";
 
 type RuntimeEnv = {
   DB: D1Database;
@@ -18,6 +19,9 @@ type RuntimeEnv = {
   SENSO_API_KEY?: string;
   LINQ_API_TOKEN?: string;
   LINQ_PHONE_NUMBER?: string;
+  LINQ_OWNER_PHONE?: string;
+  LINQ_WEBHOOK_SECRET?: string;
+  YUKTI_OWNER_GITHUB_LOGIN?: string;
   COMPOSIO_API_KEY?: string;
   COMPOSIO_USER_ID?: string;
   GITHUB_CLIENT_ID?: string;
@@ -67,13 +71,19 @@ export async function handleYuktiApi(request: Request, env: RuntimeEnv): Promise
       const identity = await identityFromRequest(request, env.DB, env.YUKTI_MODE);
       return identity ? reply({ user: { login: identity.login, displayName: identity.displayName } }, 200) : reply({ error: "authentication_required" }, 401);
     }
-    if (request.method !== "POST") return reply({ error: "method_not_allowed" }, 405);
-    const originError = requireSameOrigin(request, env.YUKTI_MODE);
-    if (originError) return originError;
+    if (url.pathname === "/api/webhooks/linq" && request.method === "POST") return handleLinqWebhook(request, env);
+    if (request.method !== "POST" && request.method !== "GET") return reply({ error: "method_not_allowed" }, 405);
+    if (request.method === "POST") {
+      const originError = requireSameOrigin(request, env.YUKTI_MODE);
+      if (originError) return originError;
+    }
     if (url.pathname === "/api/auth/logout") return logoutGitHub(request, env.DB);
 
     const identity = await identityFromRequest(request, env.DB, env.YUKTI_MODE);
     if (!identity) return reply({ error: "authentication_required" }, 401);
+    const conciergeResponse = await handleConciergeRequest(request, env, identity);
+    if (conciergeResponse) return conciergeResponse;
+    if (request.method !== "POST") return reply({ error: "not_found" }, 404);
     if (url.pathname === "/api/approvals") {
       await consumeRateLimit(env.DB, "approval", identity.id, 20, 60 * 60_000);
       return createApproval(request, env.DB, identity);
@@ -152,11 +162,35 @@ async function prepareWithGemini(env: RuntimeEnv, identity: { id: string; displa
 
 async function createApproval(request: Request, db: D1Database, identity: { id: string; displayName: string }) {
   const body = await readBody(request);
-  const candidateSlug = typeof body?.candidateId === "string" ? body.candidateId : "";
-  if (!/^cand-(tea|book)$/.test(candidateSlug)) return reply({ error: "unknown_candidate" }, 400);
-
   await seedJudgeData(db, identity);
-  const candidateId = scoped(identity.id, candidateSlug);
+  let candidateSlug = typeof body?.candidateId === "string" ? body.candidateId : "";
+  let candidateId: string;
+  const productSnapshotId = typeof body?.productSnapshotId === "string" ? body.productSnapshotId : "";
+  if (productSnapshotId) {
+    const snapshot = await db.prepare(`SELECT s.id, s.merchant, s.title, s.amount_minor, s.currency, s.url, s.evidence, s.retrieved_at, r.maximum_amount_minor, r.person_id, p.name AS person_name
+      FROM product_snapshots s JOIN proactive_rules r ON r.id = s.rule_id JOIN people p ON p.id = r.person_id
+      WHERE s.id = ? AND s.user_id = ? AND r.user_id = ?`).bind(productSnapshotId, identity.id, identity.id)
+      .first<{ id: string; merchant: string; title: string; amount_minor: number; currency: string; url: string; evidence: string; retrieved_at: string; maximum_amount_minor: number; person_id: string; person_name: string }>();
+    if (!snapshot) return reply({ error: "product_snapshot_not_found" }, 404);
+    if (snapshot.amount_minor > snapshot.maximum_amount_minor) return reply({ error: "product_over_budget" }, 409);
+    if (Date.parse(snapshot.retrieved_at) < Date.now() - 24 * 60 * 60_000) return reply({ error: "product_snapshot_stale" }, 409);
+    candidateSlug = `live-${snapshot.id}`;
+    candidateId = scoped(identity.id, candidateSlug);
+    const now = new Date().toISOString();
+    const liveEventId = scoped(identity.id, `evt-live-${snapshot.id}`);
+    const livePlanId = scoped(identity.id, `plan-live-${snapshot.id}`);
+    await db.batch([
+      db.prepare(`INSERT OR IGNORE INTO events (id, user_id, person_id, title, starts_at, source, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'proactive_rule', 'ready_for_approval', ?, ?)`)
+        .bind(liveEventId, identity.id, snapshot.person_id, `${snapshot.person_name} flower reminder`, now, now, now),
+      db.prepare(`INSERT OR IGNORE INTO preparation_plans (id, event_id, state, deadline_at, summary, created_at, updated_at) VALUES (?, ?, 'ready_for_approval', NULL, ?, ?, ?)`)
+        .bind(livePlanId, liveEventId, `Current flowers for ${snapshot.person_name}`, now, now),
+    ]);
+    await db.prepare(`INSERT OR IGNORE INTO candidates (id, plan_id, merchant, title, amount_minor, currency, url, evidence, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(candidateId, livePlanId, snapshot.merchant, snapshot.title, snapshot.amount_minor, snapshot.currency, snapshot.url, snapshot.evidence, now, now).run();
+  } else {
+    if (!/^cand-(tea|book)$/.test(candidateSlug)) return reply({ error: "unknown_candidate" }, 400);
+    candidateId = scoped(identity.id, candidateSlug);
+  }
   const candidate = await db.prepare(`
     SELECT c.id AS candidate_id, e.id AS event_id, c.merchant, c.title, c.amount_minor, c.currency, c.url
     FROM candidates c
@@ -180,7 +214,7 @@ async function createApproval(request: Request, db: D1Database, identity: { id: 
       .bind(auditId, identity.id, candidate.event_id, JSON.stringify({ approvalId, candidateId: candidate.candidate_id, amountMinor: candidate.amount_minor, currency: candidate.currency }), now.toISOString(), now.toISOString()),
   ]);
 
-  return reply({ approval: { id: approvalId, candidateId: candidateSlug, eventId: "evt-sarah", merchant: candidate.merchant,
+  return reply({ approval: { id: approvalId, candidateId: candidateSlug, eventId: candidate.event_id, merchant: candidate.merchant,
     amountMinor: candidate.amount_minor, currency: candidate.currency, expiresAt } }, 201);
 }
 

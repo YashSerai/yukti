@@ -1,6 +1,6 @@
 # Yukti
 
-Yukti prepares the small life-admin decisions that are easy to miss, then waits for explicit approval before money moves. The seeded judge path connects a birthday event and inspectable memory to two gift candidates, creates a single-use approval envelope, and hands the exact merchant and amount to Prava's sandbox checkout.
+Yukti is an iMessage concierge for the people you care about. It learns explicit relationship details from its Linq conversation, keeps each fact editable with its source, prepares current flower options on a chosen cadence, and waits for an exact approval before money moves. The seeded birthday path remains available for judges.
 
 ## Safety boundary
 
@@ -13,6 +13,8 @@ Yukti prepares the small life-admin decisions that are easy to miss, then waits 
 - Prava card credentials stay inside the server-side execution callback and are never returned, logged, or persisted.
 - The default `seeded` mode records approvals but cannot contact Prava.
 - `sandbox` mode can create and revoke Prava sandbox sessions. It cannot create a live charge.
+- Linq webhooks are verified over the raw body, deduplicated by provider event ID, and restricted to the configured owner line and recipient.
+- Recurring flower rules prepare recommendations. They do not create recurring charges, and every product still needs a fresh approval.
 
 ## Local development
 
@@ -35,6 +37,7 @@ The Sites build packages the D1 migrations from `drizzle/`. For a local Miniflar
 npm run build
 npx wrangler d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_outstanding_risque.sql
 npx wrangler d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0001_github_auth_guardrails.sql
+npx wrangler d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0002_relationship_concierge.sql
 ```
 
 Copy `.env.example` to an ignored local environment file or inject the same names through the runtime. Never commit real values.
