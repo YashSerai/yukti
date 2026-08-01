@@ -25,12 +25,14 @@ Release gate after the local implementation and provider-integration slices.
 - Senso retrieval and Gemini 3.6 Flash preparation proven through the Yukti API
 - Linq sandbox line verified healthy without sending a message
 - Composio Calendar remains disconnected because its managed consent requested broad edit and delete scopes
-- Typecheck, lint, 25 unit tests, rendered-output test, and production build pass
+- App-owned GitHub OAuth replaces the unreliable Sign in with ChatGPT dependency for sponsor actions; GitHub grants public-profile access only
+- PKCE, single-use login state, hashed sessions, same-origin mutation checks, per-user and global quotas, provider timeouts, and response hardening protect shared keys
+- Typecheck, lint, 29 tests, rendered-output test, and production build pass
 - Exact-value secret scan reports zero hits in tracked source and built output
 - Sites production release published at `https://yukti-prava.yashns.chatgpt.site`
 - Hosted Senso retrieval, Gemini brief, D1 approval, Prava sandbox creation, and Prava revocation verified end to end
 - Hosted provider readiness reports Prava sandbox ready, Senso configured, Gemini Flash ready, Linq healthy, and Composio disconnected
-- Production Worker error log reports zero events for the release smoke-test window
+- Production GitHub login, logout revocation, Senso-to-Gemini preparation, D1 approval, Prava sandbox creation, and Prava revocation are verified as `@YashSerai`
 
 ## Evidence refs
 
@@ -42,7 +44,7 @@ Release gate after the local implementation and provider-integration slices.
 
 ## Blockers
 
-Composio Calendar is intentionally blocked until a least-privilege read-only OAuth configuration is available. The Sites owner email is `founders@trysoulmate.com`, while the current OpenAI chooser presents a temporary Google migration address; public URL access avoids that owner-only mismatch for judges.
+Composio Calendar is intentionally blocked until a least-privilege read-only OAuth configuration is available. The existing Sites slug is immutable, so the production URL remains `yukti-prava.yashns.chatgpt.site`; changing it requires a separate approved migration or a custom domain.
 
 ## Next step
 
@@ -50,14 +52,14 @@ Write and rehearse the judge demo, then finish the Devpost submission assets. Ke
 
 ## Resume state
 
-Resume from this checkpoint, inspect Git/worktree and the live Sites release, and continue submission preparation. Do not run a second initializer, send a Linq message, or grant the current broad Composio Calendar consent without a concrete demo need.
+Resume from this checkpoint, inspect Git/worktree and the live Sites release, and continue submission preparation. Do not create a duplicate Sites project solely to change the immutable slug, send a Linq message, or grant the current broad Composio Calendar consent without a concrete demo need.
 
 ## Drift check
 
 - Intent: aligned
 - Scope: aligned
 - Compatibility: aligned
-- New owners: Sites Worker, D1, and SIWC match the approved hosting boundary
+- New owners: Sites Worker, D1, and app-owned GitHub OAuth match the approved hosting boundary
 - Retirement: fixture and optional backend rules remain explicit
 - Evidence: sufficient to begin Task 2
 - Decision: continue

@@ -31,7 +31,7 @@ Additional evidence is appended by bounded task slice, never as raw secrets or p
 - Gemini: `gemini-3.6-flash` structured generation succeeded with minimal thinking on the existing unbilled Google AI project. Pro models are rejected in code. No paid usage was incurred.
 - Linq: the configured sandbox line reports `HEALTHY`. The product has an idempotent approved-message adapter, but no message was sent during this gate.
 - Composio: the managed Google Calendar account remains `INITIATED`, not active. Consent was cancelled because it requested event editing plus calendar deletion and sharing; Yukti reports this provider as disconnected.
-- Verification: typecheck, lint, 8 test files with 25 passing tests, rendered-output test, and production build pass.
+- Verification: typecheck, lint, 9 test files with 29 passing tests, rendered-output test, and production build pass.
 - Secret boundary: the five local secret values were compared against tracked files and production output; zero exact matches were found. `.env.local` remains ignored.
 
 ## Production release gate
@@ -43,4 +43,15 @@ Additional evidence is appended by bounded task slice, never as raw secrets or p
 - Hosted preparation: Senso retrieval and Gemini 3.6 Flash returned a source-labeled decision brief. The request completed without a paid model or Pro model.
 - Hosted approval: the seeded purchase produced a server-recorded, user-scoped, single-use approval in D1.
 - Hosted Prava: Yukti created a secure sandbox checkout session from that approval and then revoked it. The checkout was not opened, no card was entered, and no charge was attempted.
-- Hosted logs: the post-smoke-test Worker error query returned zero events.
+- Hosted logs at the original SIWC release gate contained no errors. The later GitHub-auth release is recorded separately below.
+
+## GitHub authentication and abuse-control release
+
+- GitHub OAuth application: Yukti requests no OAuth scope. GitHub's consent screen showed `Public data only`; no repository or email access was requested.
+- Identity: the OAuth callback maps GitHub's numeric subject to a random internal user ID. The GitHub access token is used only to read the profile and is never persisted. Session secrets are stored only as hashes.
+- Request controls: PKCE, single-use expiring state, secure host-only cookies, same-origin mutation checks, per-user and global quotas, provider timeouts, and `429 Retry-After` responses are active in sandbox mode.
+- Build controls: local provider secrets are excluded from production Wrangler manifests. Exact secret-value, tracked-environment, and recognized key-prefix scans passed against tracked source and built output.
+- Production version 3: commit `bfd89eed103a0aacc9e2b1544153d4ab33dfee0f` deployed successfully with Sites environment revision 2.
+- Production proof: GitHub returned `@YashSerai`; readiness reported Prava `sandbox_ready`, Senso `configured`, Gemini `flash_ready`, Linq `healthy`, and Composio `disconnected`. Senso-to-Gemini preparation completed, D1 recorded a user-scoped approval, Prava created a scoped sandbox checkout session, and Yukti revoked it without opening checkout, entering a card, or attempting a charge. Logout returned the app to its anonymous gated state.
+- Runtime note: the first protected Gemini preparation returned a transient `502`; a bounded retry completed successfully. Production browser console logs were empty.
+- URL boundary: Sites supports changing the display title but not an existing URL slug. The live URL therefore remains `https://yukti-prava.yashns.chatgpt.site` unless an approved migration or custom domain is used.
