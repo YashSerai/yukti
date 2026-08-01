@@ -100,7 +100,7 @@ async function connectedSnapshot(db: D1Database, userId: string) {
     db.prepare(`SELECT id, person_id AS personId, fact, kind, value, status, origin, source, confidence, created_at AS createdAt FROM memory_facts WHERE user_id = ? ORDER BY created_at DESC`).bind(userId).all(),
     db.prepare(`SELECT r.id, r.person_id AS personId, p.name AS personName, r.kind, r.cadence_days AS cadenceDays, r.maximum_amount_minor AS maximumAmountMinor, r.currency, r.enabled, r.next_eligible_at AS nextEligibleAt, r.last_prepared_at AS lastPreparedAt FROM proactive_rules r JOIN people p ON p.id = r.person_id WHERE r.user_id = ? ORDER BY r.created_at DESC`).bind(userId).all(),
     db.prepare(`SELECT direction, body, processing_state AS processingState, created_at AS createdAt FROM messages WHERE user_id = ? ORDER BY created_at DESC LIMIT 12`).bind(userId).all(),
-    db.prepare(`SELECT id, rule_id AS ruleId, merchant, title, amount_minor AS amountMinor, currency, url, image_url AS imageUrl, availability, source_kind AS sourceKind, evidence, retrieved_at AS retrievedAt FROM product_snapshots WHERE user_id = ? ORDER BY retrieved_at DESC LIMIT 5`).bind(userId).all(),
+    db.prepare(`SELECT id, rule_id AS ruleId, merchant, title, amount_minor AS amountMinor, currency, url, image_url AS imageUrl, availability, source_kind AS sourceKind, evidence, retrieved_at AS retrievedAt FROM product_snapshots WHERE user_id = ? ORDER BY retrieved_at DESC LIMIT 1`).bind(userId).all(),
   ]);
   return { mode: "connected", people: people.results, facts: facts.results, rules: rules.results, messages: messages.results, products: products.results };
 }
