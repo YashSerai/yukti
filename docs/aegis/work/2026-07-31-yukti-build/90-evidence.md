@@ -77,3 +77,13 @@ Additional evidence is appended by bounded task slice, never as raw secrets or p
 - Gemini and Senso retry a single 502, 503, or 504 response. Timeouts and transaction mutations are never automatically retried.
 - Typecheck, lint, 9 test files with 30 passing tests, and production build pass after the verification and retry changes.
 - Submission copy, a two-minute demo script, eligibility checklist, and real-versus-simulated disclosure are present in the repository.
+
+## Relationship concierge and live messaging
+
+- Production version 11 is deployed at `https://yukti.yashns.chatgpt.site` with Sites environment revision 3.
+- Google Messages sent one attended test message only to the configured Yukti Linq number. The signed webhook persisted Sarah as girlfriend, tulips, USD 75, and a 28-day flowers rule, then sent an automated reply to the owner's phone.
+- An attended proactive scan retrieved FTD's current Sweet & Pretty Bouquet page and sent the owner a USD 45 suggestion. No purchase or charge occurred.
+- Linq's v3 create-chat response is `chat.id`; Yukti now accepts that documented shape. Repeating the same suggestion used the original idempotent response and did not produce another message.
+- Product scans now stop when the recipient has no explicit city or postal code. Production showed that prompt and returned no approval card.
+- Gemini 3.6 Flash's Interactions API is configured with the `google_search` tool. Unit evidence verifies location, budget, preferences, exact candidate URL, search query, and URL citation handling. The positive hosted search is pending an explicit Sarah demo destination and is not yet claimed.
+- Final gate: typecheck, lint with one external-image advisory and zero errors, 12 test files with 39 passing tests, rendered HTML test, production build, and zero exact secret-value hits.

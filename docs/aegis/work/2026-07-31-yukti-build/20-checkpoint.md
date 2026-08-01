@@ -4,7 +4,7 @@ Updated: `2026-07-31`
 
 ## Current todo
 
-Capture the final screenshots and demo video, then publish the Devfolio submission before the earlier stated deadline.
+Get the user's explicit demo delivery destination, prove the positive Gemini Google Search grounding path, capture the final screenshots and demo video, then publish the Devfolio submission.
 
 ## Active slice
 
@@ -23,11 +23,13 @@ Release gate after the local implementation and provider-integration slices.
 - Seeded Sarah birthday judge path implemented and rendered at desktop and phone sizes
 - Prava sandbox approval, checkout-session creation, and revocation proven without a charge
 - Senso retrieval and Gemini 3.6 Flash preparation proven through the Yukti API
-- Linq sandbox line verified healthy without sending a message
+- Signed Linq inbound webhook verified from Google Messages to the owner-only Yukti line; Sarah relationship, tulip preference, budget, and cadence were persisted with provenance, and Yukti replied
+- Proactive Linq suggestion verified with a current FTD product; Linq idempotency prevented duplicate delivery during the response-contract recheck
+- Product scans now require an explicit recipient location and cited Gemini 3.6 Flash Google Search evidence; ungrounded snapshots cannot enter the live-product approval flow
 - Composio Calendar is connected as `yukti-owner` after the user explicitly approved the disclosed Google Calendar scopes
 - App-owned GitHub OAuth replaces the unreliable Sign in with ChatGPT dependency for sponsor actions; GitHub grants public-profile access only
 - PKCE, single-use login state, hashed sessions, same-origin mutation checks, per-user and global quotas, provider timeouts, and response hardening protect shared keys
-- Typecheck, lint, 30 tests, rendered-output test, and production build pass
+- Typecheck, lint, 39 tests, rendered-output test, and production build pass
 - Exact-value secret scan reports zero hits in tracked source and built output
 - Canonical Sites production release published at `https://yukti.yashns.chatgpt.site`; the previous project remains available as rollback
 - Hosted Senso retrieval, Gemini brief, D1 approval, Prava sandbox creation, and Prava revocation verified end to end
@@ -49,11 +51,11 @@ Release gate after the local implementation and provider-integration slices.
 
 ## Blockers
 
-Prava's hosted sandbox is still provider-pending after the submitted test card, so scoped credential issuance and final status reporting do not yet have attended production evidence. Final screenshots, the short demo video, the scheduled first GitHub push, and Devfolio publication remain open.
+Prava's hosted sandbox is still provider-pending after the submitted test card, so scoped credential issuance and final status reporting do not yet have attended production evidence. Sarah has no explicit demo destination, so the positive grounded-product search is not yet run. Final screenshots, the short demo video, the scheduled first GitHub push, and Devfolio publication remain open.
 
 ## Next step
 
-Deploy the final verification path, re-check the pending Prava session, capture production screenshots, record the short demo, and publish the Devfolio project after the scheduled first GitHub push.
+Add an explicit demo destination through Linq, verify the cited Gemini search and exact-product approval, re-check the pending Prava session, then capture and submit the demo.
 
 ## Resume state
 
