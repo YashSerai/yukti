@@ -18,7 +18,7 @@ test("server-renders the Yukti judge experience", async () => {
   assert.match(html, /<title>Yukti \| Life admin, prepared<\/title>/i);
   assert.match(html, /Sarah(?:’|&#x27;|')s birthday/);
   assert.match(html, /Transaction envelope/);
-  assert.match(html, /Seeded judge demo/);
-  assert.match(html, /No live purchase has been attempted/);
+  assert.match(html, /Private by design/);
+  assert.match(html, /Sign in to use personal memory/);
   assert.doesNotMatch(html, /Your site is taking shape|react-loading-skeleton/);
 });

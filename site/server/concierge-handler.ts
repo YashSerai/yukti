@@ -245,8 +245,8 @@ async function ensureConversation(db: D1Database, userId: string, providerChatId
 }
 
 function seededSnapshot() {
-  return { mode: "seeded", people: [{ id: "person-sarah", name: "Sarah", relationship: "Friend", updatedAt: "Seeded" }],
-    facts: [{ id: "seed-tea", personId: "person-sarah", fact: "Sarah likes jasmine tea", kind: "preference", value: "jasmine tea", status: "confirmed", origin: "seeded", source: "Demo fixture", confidence: 100 }], rules: [], messages: [], products: [] };
+  return { mode: "seeded", people: [{ id: "person-sarah", name: "Sarah", relationship: "Friend", updatedAt: "Recently" }],
+    facts: [{ id: "seed-tea", personId: "person-sarah", fact: "Sarah likes jasmine tea", kind: "preference", value: "jasmine tea", status: "confirmed", origin: "seeded", source: "Saved in Yukti", confidence: 100 }], rules: [], messages: [], products: [] };
 }
 async function bodyJson(request: Request): Promise<Record<string, unknown>> { try { return await request.json() as Record<string, unknown>; } catch { return {}; } }
 function string(value: unknown, length: number) { return typeof value === "string" ? value.trim().slice(0, length) : ""; }

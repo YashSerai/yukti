@@ -161,7 +161,7 @@ export function YuktiDemo() {
       if (!response.ok || !result.brief) throw new Error(result.error ?? "prepare_failed");
       setBrief(result.brief);
     } catch {
-      setBriefError("Gemini could not prepare a brief or the safety quota has been reached. The seeded options are still available.");
+      setBriefError("Gemini could not refresh this brief right now. Your saved options are still available.");
     } finally { setBriefBusy(false); }
   };
 
@@ -240,7 +240,7 @@ export function YuktiDemo() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <button className="wordmark" onClick={reset} disabled={Boolean(sandboxSession)} aria-label="Reset Yukti demo"><span>Y</span> Yukti</button>
+        <button className="wordmark" onClick={reset} disabled={Boolean(sandboxSession)} aria-label="Reset Yukti"><span>Y</span> Yukti</button>
         <nav aria-label="Primary navigation">
           {(["Today", "People", "Wallet", "Audit"] as View[]).map((item) => (
             <button key={item} className={view === item ? "nav-active" : ""} onClick={() => setView(item)}>{item}</button>
@@ -250,8 +250,8 @@ export function YuktiDemo() {
           : <a className="auth-control sign-in" href="/api/auth/github/start?return_to=/">{authChecking ? "Checking sign-in…" : "Sign in with GitHub"}</a>}
       </header>
 
-      <div className="demo-strip"><span>{concierge?.mode === "connected" ? "Connected owner" : "Seeded judge demo"}</span><p>{concierge?.mode === "connected" ? "Linq memory and product scans are live. Every purchase still waits for approval." : "Birthday recommendations are fixtures. No live purchase has been attempted."}</p><button onClick={reset} disabled={Boolean(sandboxSession)} title={sandboxSession ? "Cancel the open Prava session before resetting" : undefined}>Reset</button></div>
-      {!authChecking && !user && <div className="auth-banner"><div><strong>Explore freely. Sign in only to run sponsor integrations.</strong><p>GitHub identity protects the shared sandbox keys. Yukti requests no repository or email access.</p></div><a href="/api/auth/github/start?return_to=/">Continue with GitHub</a></div>}
+      <div className="demo-strip"><span>{concierge?.mode === "connected" ? "Memory connected" : "Private by design"}</span><p>{concierge?.mode === "connected" ? "Messages and product research are connected. You approve every purchase." : "Sign in to use personal memory, current recommendations, and purchase approvals."}</p><button onClick={reset} disabled={Boolean(sandboxSession)} title={sandboxSession ? "Cancel the open checkout before resetting" : undefined}>Reset</button></div>
+      {!authChecking && !user && <div className="auth-banner"><div><strong>Sign in to make Yukti yours.</strong><p>Your people, recommendations, and approvals stay tied to your account.</p></div><a href="/api/auth/github/start?return_to=/">Continue with GitHub</a></div>}
 
       {view === "Today" ? (
         <section className="today-grid">
@@ -274,8 +274,8 @@ export function YuktiDemo() {
             {selectedEvent === "evt-sarah" ? (
               <>
                 <div className="workspace-head"><div><div className="eyebrow brass">Ready to review</div><h2>Sarah’s birthday, prepared.</h2><p>Two options fit what you remember about Sarah and can arrive before dinner.</p></div><div className="deadline"><small>Decision window</small><strong>2 days</strong><span>for comfortable delivery</span></div></div>
-                <div className="context-line"><span>Known context</span><p>Jasmine tea · ceramics class · prefers useful gifts</p><div className="context-actions"><button onClick={() => setView("People")}>View memory</button><button onClick={prepareWithGemini} disabled={briefBusy || !user}>{briefBusy ? "Gemini is preparing…" : brief ? "Refresh Gemini brief" : "Prepare with Gemini 3.6 Flash"}</button></div></div>
-                {brief && <div className="model-brief"><span>Senso memory → Gemini decision brief</span><p>{brief.summary}</p><small>{brief.caution}</small></div>}
+                <div className="context-line"><span>Known context</span><p>Jasmine tea · ceramics class · prefers useful gifts</p><div className="context-actions"><button onClick={() => setView("People")}>View memory</button><button onClick={prepareWithGemini} disabled={briefBusy || !user}>{briefBusy ? "Preparing your brief…" : brief ? "Refresh gift brief" : "Prepare a gift brief"}</button></div></div>
+                {brief && <div className="model-brief"><span>Why these fit</span><p>{brief.summary}</p><small>{brief.caution}</small></div>}
                 {briefError && <p className="inline-error" role="alert">{briefError}</p>}
                 <div className="candidate-grid">
                   {seedCandidates.map((item, index) => (
@@ -284,7 +284,7 @@ export function YuktiDemo() {
                       <span className="merchant">{item.merchant}</span><h3>{item.title}</h3><p>{item.reason}</p>
                       {brief && <p className="model-reason">{brief.candidateReasons.find((reason) => reason.candidateId === item.id)?.reason}</p>}
                       <div className="candidate-meta"><strong>{money(item.price, item.currency)}</strong><span>{item.arrival}</span></div>
-                      <small>{brief ? `Senso fixture → ${brief.model}` : item.evidence}</small>
+                      <small>{brief ? "Memory and product details checked" : item.evidence}</small>
                     </button>
                   ))}
                 </div>
@@ -294,12 +294,12 @@ export function YuktiDemo() {
                   <dl><div><dt>Bound to</dt><dd>Sarah’s birthday dinner</dd></div><div><dt>Expires</dt><dd>In 15 minutes</dd></div><div><dt>Status</dt><dd>{approved ? "Recorded on server" : "Awaiting you"}</dd></div></dl>
                   {!approved && user && <button className="primary" onClick={() => setReviewing(true)}>Review and approve</button>}
                   {!approved && !user && <a className="primary" href="/api/auth/github/start?return_to=/">Sign in to approve</a>}
-                  {approved && !sandboxSession && <button className="primary" onClick={startPrava} disabled={paymentBusy}>{paymentBusy ? "Starting sandbox…" : "Continue in Prava sandbox"}</button>}
+                  {approved && !sandboxSession && <button className="primary" onClick={startPrava} disabled={paymentBusy}>{paymentBusy ? "Opening checkout…" : "Continue to secure checkout"}</button>}
                   {sandboxSession && <div className="sandbox-actions"><a className="primary" href={sandboxSession.checkoutUrl} target="_blank" rel="noreferrer">Open secure Prava checkout</a><button onClick={verifyPrava} disabled={paymentBusy}>{paymentBusy ? "Checking…" : "Verify sandbox result"}</button><button onClick={cancelPrava} disabled={paymentBusy || sandboxOutcome?.state === "sandbox_declined" || sandboxOutcome?.state === "completed"}>{paymentBusy ? "Cancelling…" : "Cancel sandbox session"}</button></div>}
-                  {approvalId && !sandboxSession && <p className="microcopy" role="status">Approval {approvalId.slice(0, 8)} is ready for a Prava sandbox session.</p>}
+                  {approvalId && !sandboxSession && <p className="microcopy" role="status">Approval {approvalId.slice(0, 8)} is ready for secure checkout.</p>}
                   {sandboxSession && <p className="microcopy" role="status">Prava created a secure, scoped sandbox session. No live charge is possible.</p>}
                   {sandboxOutcome?.state === "pending" && <p className="microcopy" role="status">Prava is still securing the sandbox card. Check again in a moment.</p>}
-                  {sandboxOutcome?.state === "sandbox_declined" && <p className="microcopy success-note" role="status">Scoped credentials received. The seeded merchant simulator declined the test card, and Yukti reported that outcome to Prava.</p>}
+                  {sandboxOutcome?.state === "sandbox_declined" && <p className="microcopy success-note" role="status">Scoped credentials received. The merchant declined the test card, and Yukti reported that outcome to Prava.</p>}
                   {sandboxOutcome?.state === "completed" && <p className="microcopy success-note" role="status">Prava confirmed the sandbox transaction lifecycle.</p>}
                   {paymentError && <p className="form-error" role="alert">{paymentError}</p>}
                   <p className="microcopy">Approval is single-use and cannot be applied to another item, merchant, or amount.</p>
@@ -320,9 +320,9 @@ export function YuktiDemo() {
             <span className="eyebrow brass">Final check</span><h2 id="approval-title">Approve this exact purchase?</h2>
             <div className="receipt"><p>{candidate.title}</p><span>{candidate.merchant}</span><strong>{money(candidate.price, candidate.currency)}</strong></div>
             <ul><li>Only this merchant and amount</li><li>Expires after 15 minutes</li><li>No card details are stored by Yukti</li></ul>
-            <button className="primary wide" onClick={approve} disabled={approvalBusy}>{approvalBusy ? "Recording exact approval…" : approved ? "Create a fresh approval" : "Approve seeded demo"}</button>
+            <button className="primary wide" onClick={approve} disabled={approvalBusy}>{approvalBusy ? "Recording exact approval…" : approved ? "Create a fresh approval" : "Approve this purchase"}</button>
             {approvalError && <p className="form-error" role="alert">{approvalError}</p>}
-            <p className="modal-foot">This records a single-use approval on Yukti’s server. It does not contact Prava or charge a card.</p>
+            <p className="modal-foot">This records a single-use approval. It does not open checkout or charge a card.</p>
           </section>
         </div>
       )}
@@ -332,13 +332,13 @@ export function YuktiDemo() {
 
 function EmptyEvent({ eventId }: { eventId: string }) {
   const passport = eventId === "evt-passport";
-  return <div className="empty-event"><span className="large-mark">{passport ? "12" : "15"}</span><div className="eyebrow brass">{passport ? "Needs one answer" : "Watching"}</div><h2>{passport ? "Passport renewal needs your travel date." : "Nothing to do yet."}</h2><p>{passport ? "Yukti can prepare the renewal checklist after you confirm whether international travel is booked in the next six months." : "Yukti will surface the dentist follow-up if a form, payment, or calendar decision appears."}</p><p className="page-note">{passport ? "Travel detail collection is outside this transaction demo." : "No action is available until the follow-up becomes relevant."}</p></div>;
+  return <div className="empty-event"><span className="large-mark">{passport ? "12" : "15"}</span><div className="eyebrow brass">{passport ? "Needs one answer" : "Watching"}</div><h2>{passport ? "Passport renewal needs your travel date." : "Nothing to do yet."}</h2><p>{passport ? "Yukti can prepare the renewal checklist after you confirm whether international travel is booked in the next six months." : "Yukti will surface the dentist follow-up if a form, payment, or calendar decision appears."}</p><p className="page-note">{passport ? "Add your travel details whenever you are ready." : "No action is available until the follow-up becomes relevant."}</p></div>;
 }
 
 function SecondaryView({ view, providerStatus, statusBusy, statusError, authenticated, onCheckProviders, concierge, conciergeBusy, conciergeError, onReloadConcierge, onUpdateConcierge, onScanFlowers, onApproveProduct }: { view: Exclude<View, "Today">; providerStatus: ProviderStatus | null; statusBusy: boolean; statusError: string | null; authenticated: boolean; onCheckProviders: () => void; concierge: ConciergeSnapshot | null; conciergeBusy: boolean; conciergeError: string | null; onReloadConcierge: () => Promise<void>; onUpdateConcierge: (path: string, body: Record<string, unknown>) => Promise<unknown>; onScanFlowers: (send: boolean) => Promise<void>; onApproveProduct: (product: ConciergeSnapshot["products"][number]) => Promise<void> }) {
   if (view === "People") return <PeopleView snapshot={concierge} busy={conciergeBusy} error={conciergeError} authenticated={authenticated} onReload={onReloadConcierge} onUpdate={onUpdateConcierge} onScan={onScanFlowers} onApproveProduct={onApproveProduct} />;
-  if (view === "Wallet") return <section className="secondary-page"><div className="eyebrow">Wallet</div><h1>No open transactions.</h1><div className="ledger-zero"><strong>$0.00</strong><span>spent through this seeded demo</span></div><p className="page-note">Yukti creates short-lived, purchase-scoped approval envelopes. A real Prava credential is requested only after approval.</p></section>;
-  return <section className="secondary-page"><div className="eyebrow">Audit</div><h1>Consequences, recorded.</h1><div className="connection-check"><div><strong>Provider readiness</strong><p>Checks configuration and read-only health. It does not send a message or start a payment.</p></div><button className="secondary" onClick={onCheckProviders} disabled={statusBusy || !authenticated}>{statusBusy ? "Checking…" : authenticated ? "Check connections" : "Sign in to check"}</button></div>{statusError && <p className="inline-error" role="alert">{statusError}</p>}{providerStatus && <div className="provider-grid" aria-live="polite">{Object.entries(providerStatus.providers).map(([name, status]) => <div key={name}><span>{name}</span><strong>{status.state.replaceAll("_", " ")}</strong>{status.detail && <small>{status.detail}</small>}</div>)}</div>}<div className="audit-list">{seedAudit.map((item) => <div key={item.time + item.title}><time>{item.time}</time><span><strong>{item.title}</strong><small>{item.detail}</small></span></div>)}</div></section>;
+  if (view === "Wallet") return <section className="secondary-page"><div className="eyebrow">Wallet</div><h1>No open transactions.</h1><div className="ledger-zero"><strong>$0.00</strong><span>spent through Yukti</span></div><p className="page-note">Yukti creates short-lived, purchase-scoped approvals. Payment details are requested only after you approve.</p></section>;
+  return <section className="secondary-page"><div className="eyebrow">Audit</div><h1>Consequences, recorded.</h1><div className="connection-check"><div><strong>Connected services</strong><p>Check whether messaging, memory, research, calendar, and checkout are available. This does not send a message or start a payment.</p></div><button className="secondary" onClick={onCheckProviders} disabled={statusBusy || !authenticated}>{statusBusy ? "Checking…" : authenticated ? "Check connections" : "Sign in to check"}</button></div>{statusError && <p className="inline-error" role="alert">{statusError}</p>}{providerStatus && <div className="provider-grid" aria-live="polite">{Object.entries(providerStatus.providers).map(([name, status]) => <div key={name}><span>{name}</span><strong>{status.state.replaceAll("_", " ")}</strong>{status.detail && <small>{status.detail}</small>}</div>)}</div>}<div className="audit-list">{seedAudit.map((item) => <div key={item.time + item.title}><time>{item.time}</time><span><strong>{item.title}</strong><small>{item.detail}</small></span></div>)}</div></section>;
 }
 
 function PeopleView({ snapshot, busy, error, authenticated, onReload, onUpdate, onScan, onApproveProduct }: { snapshot: ConciergeSnapshot | null; busy: boolean; error: string | null; authenticated: boolean; onReload: () => Promise<void>; onUpdate: (path: string, body: Record<string, unknown>) => Promise<unknown>; onScan: (send: boolean) => Promise<void>; onApproveProduct: (product: ConciergeSnapshot["products"][number]) => Promise<void> }) {
@@ -362,7 +362,7 @@ function PeopleView({ snapshot, busy, error, authenticated, onReload, onUpdate, 
         {!snapshot.people.length && <p>No one saved yet. Add the first fact or text Yukti.</p>}
       </aside>
       <div className="memory-sheet">
-        <div className="memory-sheet-head"><div><h2>{personName}</h2><p>{connected ? "Connected memory" : "Seeded judge memory"}</p></div><button className="secondary" onClick={() => void onReload()} disabled={busy}>Refresh</button></div>
+        <div className="memory-sheet-head"><div><h2>{personName}</h2><p>{connected ? "Connected memory" : "Saved memory"}</p></div><button className="secondary" onClick={() => void onReload()} disabled={busy}>Refresh</button></div>
         <div className="fact-list">
           {snapshot.facts.filter((fact) => snapshot.people.find((person) => person.id === fact.personId)?.name.toLowerCase() === personName.toLowerCase()).map((fact) => <MemoryFactRow key={fact.id} fact={fact} editable={connected} busy={busy} onUpdate={onUpdate} />)}
           {!snapshot.facts.length && <p className="memory-empty">Text Yukti something like &quot;Sarah loves tulips&quot; or add a fact below.</p>}

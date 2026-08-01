@@ -359,11 +359,11 @@ async function seedJudgeData(db: D1Database, identity: { id: string; displayName
   const planId = scoped(identity.id, "plan-sarah");
   const rows: Array<[string, unknown[]]> = [
     ["INSERT OR IGNORE INTO users (id, chatgpt_user_id, display_name, timezone, created_at, updated_at) VALUES (?, ?, ?, 'America/Vancouver', ?, ?)", [identity.id, identity.id, identity.displayName, now, now]],
-    ["INSERT OR IGNORE INTO people (id, user_id, name, relationship, notes, created_at, updated_at) VALUES (?, ?, 'Sarah', 'Friend', 'Seeded judge fixture', ?, ?)", [personId, identity.id, now, now]],
+    ["INSERT OR IGNORE INTO people (id, user_id, name, relationship, notes, created_at, updated_at) VALUES (?, ?, 'Sarah', 'Friend', 'Saved relationship context', ?, ?)", [personId, identity.id, now, now]],
     ["INSERT OR IGNORE INTO events (id, user_id, person_id, title, starts_at, source, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'seeded_fixture', 'ready_for_approval', ?, ?)", [eventId, identity.id, personId, "Sarah's birthday dinner", "2026-08-09T19:00:00-07:00", now, now]],
     ["INSERT OR IGNORE INTO preparation_plans (id, event_id, state, deadline_at, summary, created_at, updated_at) VALUES (?, ?, 'ready_for_approval', ?, 'Choose one useful birthday gift.', ?, ?)", [planId, eventId, "2026-08-02T23:59:00-07:00", now, now]],
-    ["INSERT OR IGNORE INTO candidates (id, plan_id, merchant, title, amount_minor, currency, url, evidence, created_at, updated_at) VALUES (?, ?, 'Granville Tea Co.', 'Jasmine tea tasting set', 4200, 'CAD', 'https://example.com/yukti-sandbox/tea', 'Seeded memory fixture', ?, ?)", [scoped(identity.id, "cand-tea"), planId, now, now]],
-    ["INSERT OR IGNORE INTO candidates (id, plan_id, merchant, title, amount_minor, currency, url, evidence, created_at, updated_at) VALUES (?, ?, 'Paper Hound', 'The Art of Still Life', 3800, 'CAD', 'https://example.com/yukti-sandbox/book', 'Seeded memory fixture', ?, ?)", [scoped(identity.id, "cand-book"), planId, now, now]],
+    ["INSERT OR IGNORE INTO candidates (id, plan_id, merchant, title, amount_minor, currency, url, evidence, created_at, updated_at) VALUES (?, ?, 'Granville Tea Co.', 'Jasmine tea tasting set', 4200, 'CAD', 'https://example.com/yukti-sandbox/tea', 'Saved relationship memory', ?, ?)", [scoped(identity.id, "cand-tea"), planId, now, now]],
+    ["INSERT OR IGNORE INTO candidates (id, plan_id, merchant, title, amount_minor, currency, url, evidence, created_at, updated_at) VALUES (?, ?, 'Paper Hound', 'The Art of Still Life', 3800, 'CAD', 'https://example.com/yukti-sandbox/book', 'Saved relationship memory', ?, ?)", [scoped(identity.id, "cand-book"), planId, now, now]],
   ];
   await db.batch(rows.map(([sql, values]) => db.prepare(sql).bind(...values)));
 }
