@@ -273,14 +273,15 @@ async function verifyPravaSession(request: Request, env: RuntimeEnv, userId: str
   if (!env.PRAVA_SECRET_KEY?.startsWith("sk_test_")) return reply({ error: "prava_sandbox_not_configured" }, 503);
   const body = await readBody(request);
   const transactionId = typeof body?.transactionId === "string" ? body.transactionId : "";
-  if (!transactionId) return reply({ error: "transaction_required" }, 400);
+  const sessionId = typeof body?.sessionId === "string" ? body.sessionId : "";
+  if (!transactionId && !sessionId) return reply({ error: "transaction_or_session_required" }, 400);
   const transaction = await env.DB.prepare(`
     SELECT t.id AS transaction_id, t.prava_session_id, t.state, a.event_id
     FROM transactions t JOIN approvals a ON a.id = t.approval_id
-    WHERE t.id = ? AND a.user_id = ?
-  `).bind(transactionId, userId).first<TransactionRow>();
+    WHERE (t.id = ? OR t.prava_session_id = ?) AND a.user_id = ?
+  `).bind(transactionId, sessionId, userId).first<TransactionRow>();
   if (!transaction?.prava_session_id) return reply({ error: "prava_session_not_found" }, 404);
-  if (transaction.state !== "purchasing") return reply({ transactionId, state: transaction.state, scopedCredentialsReceived: false }, 200);
+  if (transaction.state !== "purchasing") return reply({ transactionId: transaction.transaction_id, state: transaction.state, scopedCredentialsReceived: false }, 200);
 
   try {
     const result = await new PravaClient(env.PRAVA_SECRET_KEY).executeAwaitingPayment(
@@ -288,7 +289,7 @@ async function verifyPravaSession(request: Request, env: RuntimeEnv, userId: str
       async () => ({ status: "DECLINED", responseCode: "05", amountPaid: "0.00" }),
     );
     if (result.state === "pending") {
-      return reply({ transactionId, state: "pending", scopedCredentialsReceived: false }, 202);
+      return reply({ transactionId: transaction.transaction_id, state: "pending", scopedCredentialsReceived: false }, 202);
     }
 
     const now = new Date().toISOString();
@@ -296,12 +297,12 @@ async function verifyPravaSession(request: Request, env: RuntimeEnv, userId: str
     const state = result.state === "completed" ? "completed" : "sandbox_declined";
     await env.DB.batch([
       env.DB.prepare(`UPDATE transactions SET state = ?, merchant_reference = ?, failure_code = ?, updated_at = ? WHERE id = ? AND state = 'purchasing'`)
-        .bind(result.state, result.reference ?? null, result.state === "failed" ? "sandbox_test_card_declined" : null, now, transactionId),
+        .bind(result.state, result.reference ?? null, result.state === "failed" ? "sandbox_test_card_declined" : null, now, transaction.transaction_id),
       env.DB.prepare(`INSERT INTO audit_events (id, user_id, event_id, kind, detail, created_at, updated_at)
         VALUES (?, ?, ?, 'payment.sandbox_result', ?, ?, ?)`)
-        .bind(crypto.randomUUID(), userId, transaction.event_id ?? null, JSON.stringify({ transactionId, state, scopedCredentialsReceived, providerConfirmation: result.networkConfirmation ?? null }), now, now),
+        .bind(crypto.randomUUID(), userId, transaction.event_id ?? null, JSON.stringify({ transactionId: transaction.transaction_id, state, scopedCredentialsReceived, providerConfirmation: result.networkConfirmation ?? null }), now, now),
     ]);
-    return reply({ transactionId, state, scopedCredentialsReceived, providerConfirmation: result.networkConfirmation }, 200);
+    return reply({ transactionId: transaction.transaction_id, state, scopedCredentialsReceived, providerConfirmation: result.networkConfirmation }, 200);
   } catch (error) {
     const providerCode = error instanceof PravaRequestError ? error.code
       : error instanceof PravaResponseError ? `INVALID_RESPONSE_${error.issue.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}`
