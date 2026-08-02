@@ -1,62 +1,76 @@
 # Yukti demo narration
 
-Target: about 95 seconds at a calm, conversational pace.
+Target: about 2 minutes and 8 seconds at a calm, conversational pace.
 
 The quoted paragraphs are the words to read. The visual directions are not part of the narration.
 
-## 0:00 to 0:10 | Meet Yukti
+## 0:00 to 0:12
 
-> This is Yukti, a personal concierge that remembers the people in your life, keeps track of what needs doing, and helps you buy the right thing without taking control away from you.
+> Yukti is a personal concierge for the people and events in your life. It finds upcoming events on your Calendar, keeps track of what needs doing, remembers who people are and what they like, and helps you buy the right thing for them.
 
-Open on the public landing page, then sign in. Do not show Sarah or any account data until the signed-in page appears.
-
-## 0:10 to 0:27 | Message naturally
+## 0:12 to 0:27
 
 > I can message Yukti naturally. Here, I told it that Sarah is my girlfriend, she likes tulips, she lives in Vancouver, and I usually spend up to seventy-five dollars. I also asked it to remind me about flowers every four weeks.
 
-Show the privacy-cropped Yukti conversation. Keep the user message and Yukti's reply readable. Do not show the Google Messages sidebar, a phone number, or any setup language.
+Show the real Sarah conversation.
 
-## 0:27 to 0:40 | Memory you can inspect
+## 0:27 to 0:43
 
-> Yukti turns that conversation into a profile I can inspect, correct, or delete. The next time I ask about Sarah, I do not have to explain who she is or what she likes again.
+> I can ask Yukti to find a gift or buy something for someone. If important details are missing, it asks instead of guessing.
 
-Cut to Sarah's People page. Hold on the relationship, tulip preference, location, budget, and cadence. Do not label the data as seeded.
+Show: “Get flowers for Mom.”
 
-## 0:40 to 0:55 | More than gifts
+Show Yukti asking: “What kind of flowers does your mom like, where should they be delivered, and what would you like to spend?”
 
-> It also brings upcoming Calendar dates and personal jobs into one place. A passport renewal can ask for the missing expiry date. A dentist follow-up can keep its own notes and status. Yukti remembers the answer and moves the task forward.
+Show reply: “She loves tulips. Keep it under sixty dollars.”
 
-Show Today, open the passport task, enter or reveal its answer, then return to Today. Briefly show Calendar as connected. Do not imply Calendar is checked continuously.
+## 0:43 to 1:00
 
-## 0:55 to 1:10 | A proactive suggestion
+> Yukti can also be proactive. It checks my Calendar once a day, or whenever I refresh it, and brings upcoming events like birthdays into the dashboard. If I save a recurring flower reminder, it checks when it is due and can send me a suggestion.
 
-> When Sarah's flower reminder is due, Yukti checks a current merchant page against her location and my budget. This FTD bouquet came from a live page, and the source stays beside the recommendation so I can verify it.
+> That could mean weekly flowers for my girlfriend, tulips for my mom on Mother’s Day, or preparing a gift before Valentine’s Day. Yukti does the preparation, but it still waits for me before buying anything.
 
-Show the current FTD product card. Keep the price, source link, Vancouver context, and merchant-confirmation caveat readable. Do not claim guaranteed stock, delivery, or price.
+Show the dashboard immediately after login, followed by a short montage of proactive and reactive messages.
 
-## 1:10 to 1:24 | Exact approval
+“Sarah’s birthday is next week. Want me to find something based on what she likes?”
 
-> If I want it, I approve one exact merchant, item, amount, and fifteen-minute window. That permission is single-use. A reminder can prepare a purchase, but it cannot silently become a subscription or charge me again.
+“It has been four weeks since you last bought flowers for Sarah. Want me to find something she would like within your usual budget?”
 
-Create the approval from the live FTD card, then show the new entry in Purchases. Keep the amount and expiry visible.
+“Mother’s Day is coming up. Your mom likes tulips. Want me to find an option under sixty dollars?”
 
-## 1:24 to 1:37 | The transaction boundary
+“Find a Valentine’s Day gift for Sarah.”
 
-> Prava turns that approval into a scoped sandbox checkout. Card entry and Visa verification stay inside Prava, while Yukti keeps payment credentials off the page. For this demo, I stop at the secure handoff and do not claim a completed payment.
+## 1:00 to 1:13
 
-Show the Prava checkout handoff briefly. Leave before the missing-OTP or pending-result screen appears.
+> Those conversations become profiles I can inspect, correct, or delete. The next time I ask about Sarah or my mom, I do not have to explain who they are, what they like, where they live, or what I usually spend.
 
-## 1:37 to 1:49 | How it works
+Show Sarah’s People profile, then briefly show the editable controls.
 
-> Linq carries the conversation. Senso retrieves the right memory. Gemini interprets the request and checks live product evidence. Composio imports Google Calendar. A scheduled worker checks due flower rules, but every purchase still waits for me.
+## 1:13 to 1:27
 
-Move through Activity and Calendar with clean cuts. Provider names belong in the narration, not as decorative graphics.
+> Yukti also keeps personal jobs in the same place. It can bring in an upcoming Calendar event, help you prepare for an upcoming passport renewal such as suggesting what documents to prepare, ask for travel information if you have a trip coming up, and help prepare the checklist. A dentist follow-up can keep its own notes and status.
 
-## 1:49 to 1:54 | Close
+Show Today, the passport question, the dentist task, and the connected Calendar.
 
-> Yukti remembers the person, prepares the decision, and asks before it buys.
+## 1:27 to 1:40
 
-Return to Today and hold on the product name and the next useful action.
+> When Sarah’s flower reminder is due, Yukti looks for a merchant page against her location, preferences, and my budget. This bouquet came from a real product page, and the source stays beside it so I can verify the details myself.
+
+Show the live FTD bouquet and source.
+
+## 1:40 to 1:50
+
+> Prava turns that approval into a secure checkout. Card entry and Visa verification stay inside Prava, while Yukti never sees or stores my payment details.
+
+Show the checkout handoff briefly, then leave before any OTP or pending screen.
+
+## 1:50 to 2:02
+
+> Underneath, Linq powers the conversation, Senso retrieves the right memory, Gemini understands the request and checks current product pages, Composio brings in Google Calendar, and Prava handles the payment handoff.
+
+## 2:02 to 2:08
+
+> Yukti remembers the person, notices what is coming up, prepares the decision, and asks before it buys.
 
 ## Recording notes
 

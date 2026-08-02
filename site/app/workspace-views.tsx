@@ -70,12 +70,12 @@ export function CalendarView({ snapshot, busy, error, onSync }: { snapshot: Work
   };
   const calendarSync = snapshot?.connections.syncs.find((item) => item.provider === "calendar");
   return <section className="secondary-page connections-page"><div className="connections-heading"><h1>Calendar</h1><p>Bring birthdays, appointments, reservations, and deadlines into your Yukti day.</p></div>{error && <p className="inline-error" role="alert">{error}</p>}
-    <div className="connection-ledger"><ConnectionRow title="Google Calendar" detail="Yukti imports upcoming events when you ask it to check. Your calendar remains the source of truth." connected={Boolean(snapshot?.connections.calendarConnected)} syncedAt={calendarSync?.lastSyncedAt} busy={busy} onConnect={connect} onSync={onSync} /></div>
+    <div className="connection-ledger"><ConnectionRow title="Google Calendar" detail="Yukti checks once a day and whenever you refresh. Your calendar remains the source of truth." connected={Boolean(snapshot?.connections.calendarConnected)} syncedAt={calendarSync?.lastSyncedAt} busy={busy} onConnect={connect} onSync={onSync} /></div>
   </section>;
 }
 
 function ConnectionRow({ title, detail, connected, syncedAt, busy, onConnect, onSync }: { title: string; detail: string; connected: boolean; syncedAt?: string | null; busy: boolean; onConnect: () => void; onSync: () => void }) {
-  return <article><div><span>{connected ? "Connected" : "Not connected"}</span><h2>{title}</h2><p>{detail}</p>{syncedAt && <small>Last checked {new Date(syncedAt).toLocaleString()}</small>}</div><button onClick={connected ? onSync : onConnect} disabled={busy}>{connected ? "Check now" : "Connect"}</button></article>;
+  return <article><div><span>{connected ? "Connected" : "Not connected"}</span><h2>{title}</h2><p>{detail}</p>{syncedAt && <small>Last checked {new Date(syncedAt).toLocaleString()}</small>}</div><button onClick={connected ? onSync : onConnect} disabled={busy}>{connected ? "Refresh now" : "Connect"}</button></article>;
 }
 function taskState(task: WorkspaceTask) { if (task.requiredQuestion && !task.answer) return "Needs an answer"; if (task.kind === "occasion") return "Occasion"; if (task.kind === "appointment") return "Appointment"; return task.status === "watching" ? "Watching" : task.status.replace(/_/g, " "); }
 function sourceName(source: string) { return source === "google_calendar" ? "From Google Calendar" : source === "linq" ? "From your messages" : "Added in Yukti"; }

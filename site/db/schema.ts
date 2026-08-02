@@ -101,7 +101,8 @@ export const taskDetails = sqliteTable("task_details", {
   eventId: text("event_id").primaryKey().references(() => events.id), userId: text("user_id").notNull().references(() => users.id),
   kind: text("kind").notNull(), description: text("description"), actionState: text("action_state").notNull().default("watching"),
   requiredQuestion: text("required_question"), answer: text("answer"), location: text("location"), externalId: text("external_id"),
-  sourceUrl: text("source_url"), ...timestamps,
+  sourceUrl: text("source_url"), sourceDescription: text("source_description"),
+  enrichmentFingerprint: text("enrichment_fingerprint"), enrichedAt: text("enriched_at"), ...timestamps,
 });
 export const connectionSyncs = sqliteTable("connection_syncs", {
   id: text("id").primaryKey(), userId: text("user_id").notNull().references(() => users.id), provider: text("provider").notNull(),

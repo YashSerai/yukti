@@ -26,13 +26,13 @@ A user can text Yukti through Linq with a relationship, preference, budget, loca
 
 Only then can Yukti create a scoped Prava sandbox checkout. The credential stays in the server-side transaction path, and Yukti records pending, completed, declined, provider-error, and revoked states without silently retrying an uncertain purchase.
 
-The result is not a chatbot that asks the user to repeat everything. It is a small operating surface for what matters today, what Yukti remembers about each person, which tasks need input, the product evidence it found, the permission the user granted, and the transaction consequence. An hourly worker checks due flower rules and sends one idempotent suggestion per due cycle. It cannot approve a purchase.
+The result is not a chatbot that asks the user to repeat everything. It is a small operating surface for what matters today, what Yukti remembers about each person, which tasks need input, the product evidence it found, the permission the user granted, and the transaction consequence. Yukti checks a connected Calendar once a day and whenever the user refreshes it, then adds a practical preparation note and a useful question to new or changed events. An hourly worker checks due flower rules and sends one idempotent suggestion per due cycle. It cannot approve a purchase.
 
 ## How it works
 
 1. A signed Linq webhook receives a relationship, preference, budget, location, or cadence message.
 2. Yukti saves explicit facts to the user's D1-backed memory record and keeps each fact correctable or deletable. Ambiguous requests trigger a follow-up question instead of a guess.
-3. Composio imports the user's upcoming Google Calendar dates into Today when the user checks Calendar.
+3. Composio imports the user's upcoming Google Calendar dates into Today once a day and whenever the user refreshes Calendar.
 4. Senso retrieves the relevant context for a due gift or recurring flower rule.
 5. Gemini 3.6 Flash checks the exact live merchant page and returns structured product evidence with a citation.
 6. The user approves the merchant, item, amount, and 15-minute window.

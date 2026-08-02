@@ -18,7 +18,7 @@ Yukti turns that scattered process into one controlled flow. A user can text Yuk
 
 Only that approval can open a Prava sandbox checkout. A reminder can prepare a purchase, but it cannot silently become a charge.
 
-The product is a quiet workspace rather than another open-ended chat window. Today shows what needs attention, People shows what Yukti remembers, Purchases holds approvals and checkout state, Activity records meaningful changes, and Calendar imports upcoming dates on demand. A deployed hourly worker checks due flower rules and sends at most one idempotent suggestion for each due cycle. Purchases still require attended approval.
+The product is a quiet workspace rather than another open-ended chat window. Today shows what needs attention, People shows what Yukti remembers, Purchases holds approvals and checkout state, Activity records meaningful changes, and Calendar imports upcoming dates on demand and once a day. Gemini adds a practical preparation note and, when useful, one follow-up question to new or changed Calendar events. A deployed hourly worker checks due flower rules and sends at most one idempotent suggestion for each due cycle. Purchases still require attended approval.
 
 ## How Prava is used
 

@@ -1,5 +1,5 @@
-import { calendarTasks, type ImportedTask } from "../domain/task-signals";
 import { ComposioClient } from "../providers/composio/client";
+import { composioUserId, syncCalendarForUser } from "./calendar-sync";
 import type { RequestIdentity } from "./identity";
 
 export type WorkspaceEnv = {
@@ -9,6 +9,8 @@ export type WorkspaceEnv = {
   COMPOSIO_API_KEY?: string;
   COMPOSIO_USER_ID?: string;
   COMPOSIO_GOOGLE_CALENDAR_AUTH_CONFIG_ID?: string;
+  GEMINI_API_KEY?: string;
+  GEMINI_MODEL?: string;
 };
 
 const headers = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
@@ -81,45 +83,13 @@ async function updateTask(request: Request, db: D1Database, userId: string) {
 
 async function syncConnections(request: Request, env: WorkspaceEnv, identity: RequestIdentity) {
   if (!env.COMPOSIO_API_KEY) return json({ error: "connections_unavailable" }, 503);
-  const client = new ComposioClient(env.COMPOSIO_API_KEY); const composioId = composioUserId(env, identity); const now = new Date();
-  const results: Record<string, unknown> = {};
-  const connection = await client.calendarConnection(composioId);
-  if (connection.connected) {
-    const payload = await client.listCalendarEvents(composioId, connection.accountId, now.toISOString(), new Date(now.getTime() + 180 * 86_400_000).toISOString());
-    const tasks = calendarTasks(payload); await upsertImported(env.DB, identity.id, tasks, "google_calendar", now.toISOString());
-    await saveSync(env.DB, identity.id, "calendar", connection.accountId, now.toISOString(), null); results.calendar = tasks.length;
-  } else results.calendar = "not_connected";
-  return json({ syncedAt: now.toISOString(), results }, 200);
-}
-
-async function upsertImported(db: D1Database, userId: string, tasks: ImportedTask[], source: string, now: string) {
-  for (const task of tasks) {
-    const existing = await db.prepare("SELECT event_id AS eventId FROM task_details WHERE user_id = ? AND external_id = ?").bind(userId, task.externalId).first<{ eventId: string }>();
-    const id = existing?.eventId ?? crypto.randomUUID();
-    if (existing) {
-      await db.batch([
-        db.prepare("UPDATE events SET title = ?, starts_at = ?, updated_at = ? WHERE id = ? AND user_id = ?").bind(task.title, task.startsAt, now, id, userId),
-        db.prepare("UPDATE task_details SET kind = ?, description = ?, location = ?, source_url = ?, updated_at = ? WHERE event_id = ? AND user_id = ?").bind(task.kind, task.description ?? null, task.location ?? null, task.sourceUrl ?? null, now, id, userId),
-      ]);
-    } else {
-      await db.batch([
-        db.prepare("INSERT INTO events (id, user_id, person_id, title, starts_at, source, status, created_at, updated_at) VALUES (?, ?, NULL, ?, ?, ?, 'watching', ?, ?)").bind(id, userId, task.title, task.startsAt, source, now, now),
-        db.prepare("INSERT INTO task_details (event_id, user_id, kind, description, action_state, required_question, answer, location, external_id, source_url, created_at, updated_at) VALUES (?, ?, ?, ?, 'watching', NULL, NULL, ?, ?, ?, ?, ?)").bind(id, userId, task.kind, task.description ?? null, task.location ?? null, task.externalId, task.sourceUrl ?? null, now, now),
-      ]);
-    }
+  const now = new Date();
+  try {
+    const result = await syncCalendarForUser(env, identity, now);
+    return json({ syncedAt: now.toISOString(), results: { calendar: result.connected ? result : "not_connected" } }, 200);
+  } catch (error) {
+    return json({ error: "calendar_sync_failed", detail: error instanceof Error ? error.message : "Calendar sync failed" }, 502);
   }
-}
-
-async function saveSync(db: D1Database, userId: string, provider: string, accountId: string, syncedAt: string, error: string | null) {
-  const id = `${userId}:${provider}`;
-  await db.prepare(`INSERT INTO connection_syncs (id, user_id, provider, connected_account_id, last_synced_at, last_error, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(user_id, provider) DO UPDATE SET connected_account_id = excluded.connected_account_id, last_synced_at = excluded.last_synced_at, last_error = excluded.last_error, updated_at = excluded.updated_at`)
-    .bind(id, userId, provider, accountId, syncedAt, error, syncedAt, syncedAt).run();
-}
-
-function composioUserId(env: WorkspaceEnv, identity: RequestIdentity) {
-  const owner = identity.login?.toLowerCase() === (env.YUKTI_OWNER_GITHUB_LOGIN ?? "YashSerai").toLowerCase();
-  return owner ? env.COMPOSIO_USER_ID ?? "yukti-owner" : `yukti-${identity.id}`;
 }
 async function bodyJson(request: Request): Promise<Record<string, unknown>> { try { const v = await request.json(); return v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : {}; } catch { return {}; } }
 function string(value: unknown, max: number) { return typeof value === "string" ? value.trim().slice(0, max) : ""; }

@@ -16,4 +16,25 @@ describe("proactive scheduler", () => {
     const response = await handleScheduledJob(new Request("https://yukti.example/api/jobs/proactive"), { DB: db, YUKTI_SCHEDULER_SECRET: "correct" });
     expect(response?.status).toBe(405);
   });
+
+  it("reports Calendar accounts due after 24 hours without syncing during a dry run", async () => {
+    const db = {
+      prepare(query: string) {
+        return {
+          bind() {
+            return { all: async () => ({ results: query.includes("FROM connection_syncs")
+              ? [{ userId: "usr-1", login: "person" }]
+              : [] }) };
+          },
+        };
+      },
+    } as unknown as D1Database;
+    const response = await handleScheduledJob(new Request("https://yukti.example/api/jobs/proactive?dry_run=1", {
+      method: "POST", headers: { authorization: "Bearer correct" },
+    }), { DB: db, YUKTI_SCHEDULER_SECRET: "correct" });
+    expect(await response?.json()).toMatchObject({
+      calendar: { due: 1, synced: 1, failed: 0 },
+      reminders: { due: 0, prepared: 0, dryRun: true },
+    });
+  });
 });
