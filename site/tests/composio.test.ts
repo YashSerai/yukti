@@ -18,4 +18,25 @@ describe("Composio adapter", () => {
     await expect(new ComposioClient("key", fetcher as typeof fetch).createCalendarLink("user-1", "ac_calendar", "https://yukti.example/?calendar=returned"))
       .resolves.toEqual({ redirectUrl: "https://accounts.google.com/oauth", connectionId: "ca-1" });
   });
+
+  it("executes the versioned calendar list tool for the owned connection", async () => {
+    const fetcher = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      expect(String(url)).toContain("/api/v3.1/tools/execute/GOOGLECALENDAR_EVENTS_LIST");
+      expect(JSON.parse(String(init?.body))).toMatchObject({ user_id: "user-1", connected_account_id: "ca-1", version: "latest", arguments: { calendarId: "primary", maxResults: 50 } });
+      return new Response(JSON.stringify({ successful: true, data: { items: [] } }));
+    });
+    await expect(new ComposioClient("key", fetcher as typeof fetch).listCalendarEvents("user-1", "ca-1", "2026-08-02T00:00:00Z", "2026-09-02T00:00:00Z"))
+      .resolves.toEqual({ items: [] });
+  });
+
+  it("keeps Gmail connection and execution user scoped", async () => {
+    const fetcher = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).includes("connected_accounts")) return new Response(JSON.stringify({ items: [{ id: "ca-mail", user_id: "user-2", status: "ACTIVE", is_disabled: false, toolkit: { slug: "gmail" } }] }));
+      expect(JSON.parse(String(init?.body))).toMatchObject({ user_id: "user-2", connected_account_id: "ca-mail", version: "latest" });
+      return new Response(JSON.stringify({ successful: true, data: { messages: [] } }));
+    });
+    const client = new ComposioClient("key", fetcher as typeof fetch);
+    await expect(client.gmailConnection("user-2")).resolves.toEqual({ connected: true, accountId: "ca-mail" });
+    await expect(client.fetchRelevantEmails("user-2", "ca-mail", "2026-07-01")).resolves.toEqual({ messages: [] });
+  });
 });

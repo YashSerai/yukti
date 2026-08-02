@@ -7,6 +7,7 @@
 
 ## Plans
 
+- [Yukti regular-user concierge implementation plan](plans/2026-08-02-regular-user-concierge.md)
 - [Yukti hackathon implementation plan](plans/2026-07-31-yukti-hackathon.md)
 - [Yukti relationship concierge implementation plan](plans/2026-07-31-yukti-relationship-concierge.md)
 

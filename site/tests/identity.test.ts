@@ -22,4 +22,5 @@ describe("request identity", () => {
     expect(await identityFromRequest(request, db, "sandbox")).toBeNull();
     expect(await identityFromRequest(request, db, "connected")).toBeNull();
   });
+
 });

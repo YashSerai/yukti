@@ -20,6 +20,16 @@ const responseSchema = z.object({
   usageMetadata: z.object({ promptTokenCount: z.number().optional(), candidatesTokenCount: z.number().optional() }).optional(),
 });
 
+const conciergeUnderstandingSchema = z.object({
+  intent: z.enum(["memory", "gift", "recurring_gift", "task", "unknown"]),
+  personName: z.string().max(40).nullable(), relationship: z.string().max(40).nullable(),
+  preference: z.string().max(120).nullable(), location: z.string().max(120).nullable(),
+  budgetMinor: z.number().int().min(0).max(1_000_000).nullable(), cadenceDays: z.number().int().min(1).max(365).nullable(),
+  taskTitle: z.string().max(100).nullable(), taskDate: z.string().max(40).nullable(),
+  missingFields: z.array(z.enum(["person", "relationship", "preference", "location", "budget", "cadence", "date"])).max(5),
+});
+export type ConciergeUnderstanding = z.infer<typeof conciergeUnderstandingSchema>;
+
 export type PreparationBrief = z.infer<typeof preparationSchema> & {
   model: string;
   generatedAt: string;
@@ -133,6 +143,34 @@ export class GeminiFlashClient {
     }
     if (!response.ok) throw new Error(`Gemini grounded search failed with status ${response.status}`);
     return { ...extractGroundedProductResearch(await response.json(), this.model), toolUsed };
+  }
+
+  async understandConciergeMessage(message: string, pending?: { intent?: string | null; personName?: string | null; collected?: Record<string, unknown> }): Promise<ConciergeUnderstanding> {
+    const prompt = [
+      "Interpret one message to Yukti, a relationship-aware concierge.",
+      "Extract only facts the user explicitly stated. Never infer a relationship, taste, address, budget, date, or cadence.",
+      "A gift request needs person, preference, location, and budget before product research. A recurring gift also needs cadence.",
+      "Dates must be copied as written, not resolved. Use null for absent fields and list genuinely required missing fields.",
+      pending ? `Pending context: ${JSON.stringify(pending).slice(0, 1200)}` : "No pending context.",
+      `<message>${message.slice(0, 4000)}</message>`,
+    ].join("\n");
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(this.model)}:generateContent`;
+    const response = await fetchWithSingleRetry(this.fetcher, endpoint, () => ({
+      method: "POST", signal: AbortSignal.timeout(15_000), headers: { "content-type": "application/json", "x-goog-api-key": this.apiKey },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: {
+        maxOutputTokens: 800, thinkingConfig: { thinkingLevel: "minimal" }, responseMimeType: "application/json",
+        responseSchema: { type: "OBJECT", properties: {
+          intent: { type: "STRING", enum: ["memory", "gift", "recurring_gift", "task", "unknown"] },
+          personName: { type: ["STRING", "NULL"] }, relationship: { type: ["STRING", "NULL"] }, preference: { type: ["STRING", "NULL"] },
+          location: { type: ["STRING", "NULL"] }, budgetMinor: { type: ["INTEGER", "NULL"] }, cadenceDays: { type: ["INTEGER", "NULL"] },
+          taskTitle: { type: ["STRING", "NULL"] }, taskDate: { type: ["STRING", "NULL"] },
+          missingFields: { type: "ARRAY", items: { type: "STRING", enum: ["person", "relationship", "preference", "location", "budget", "cadence", "date"] } },
+        }, required: ["intent", "personName", "relationship", "preference", "location", "budgetMinor", "cadenceDays", "taskTitle", "taskDate", "missingFields"] },
+      } }),
+    }));
+    if (!response.ok) throw new Error(`Gemini request failed with status ${response.status}`);
+    const parsed = responseSchema.parse(await response.json());
+    return conciergeUnderstandingSchema.parse(JSON.parse(parsed.candidates[0].content.parts.map((part) => part.text).join("")));
   }
 }
 

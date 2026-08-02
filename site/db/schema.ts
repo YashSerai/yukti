@@ -96,3 +96,22 @@ export const productSnapshots = sqliteTable("product_snapshots", {
   amountMinor: integer("amount_minor").notNull(), currency: text("currency").notNull(), url: text("url").notNull(), imageUrl: text("image_url"),
   availability: text("availability").notNull(), sourceKind: text("source_kind").notNull(), evidence: text("evidence").notNull(), retrievedAt: text("retrieved_at").notNull(), ...timestamps,
 });
+
+export const taskDetails = sqliteTable("task_details", {
+  eventId: text("event_id").primaryKey().references(() => events.id), userId: text("user_id").notNull().references(() => users.id),
+  kind: text("kind").notNull(), description: text("description"), actionState: text("action_state").notNull().default("watching"),
+  requiredQuestion: text("required_question"), answer: text("answer"), location: text("location"), externalId: text("external_id"),
+  sourceUrl: text("source_url"), ...timestamps,
+});
+export const connectionSyncs = sqliteTable("connection_syncs", {
+  id: text("id").primaryKey(), userId: text("user_id").notNull().references(() => users.id), provider: text("provider").notNull(),
+  connectedAccountId: text("connected_account_id"), lastSyncedAt: text("last_synced_at"), lastError: text("last_error"), ...timestamps,
+});
+export const conversationStates = sqliteTable("conversation_states", {
+  userId: text("user_id").primaryKey().references(() => users.id), personName: text("person_name"), intent: text("intent"),
+  missingFields: text("missing_fields").notNull(), collected: text("collected").notNull(), expiresAt: text("expires_at").notNull(), ...timestamps,
+});
+export const scheduledRuns = sqliteTable("scheduled_runs", {
+  id: text("id").primaryKey(), userId: text("user_id").notNull().references(() => users.id), ruleId: text("rule_id").references(() => proactiveRules.id),
+  runKey: text("run_key").notNull().unique(), state: text("state").notNull(), detail: text("detail"), ...timestamps,
+});

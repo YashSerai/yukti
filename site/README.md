@@ -39,6 +39,7 @@ npx wrangler d1 execute DB --local --config dist/server/wrangler.json --persist-
 npx wrangler d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0001_github_auth_guardrails.sql
 npx wrangler d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0002_relationship_concierge.sql
 npx wrangler d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0003_user_onboarding.sql
+npx wrangler d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0004_regular_user_concierge.sql
 ```
 
 Copy `.env.example` to an ignored local environment file or inject the same names through the runtime. Never commit real values.

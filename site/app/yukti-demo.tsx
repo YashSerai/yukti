@@ -4,12 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { seedCandidates, seedEvents } from "../lib/seed";
+import { ConnectionsView, PurchasesView, WorkspaceToday, type WorkspaceSnapshot } from "./workspace-views";
 
-type View = "Today" | "People" | "Wallet" | "Audit";
+type View = "Today" | "People" | "Purchases" | "Activity" | "Connections";
 type SandboxSession = { transactionId: string; checkoutUrl: string; expiresAt: string };
 type SandboxOutcome = { state: "pending" | "sandbox_declined" | "completed" | "failed"; scopedCredentialsReceived: boolean; providerConfirmation?: string };
 type PreparationBrief = { summary: string; candidateReasons: Array<{ candidateId: string; reason: string }>; caution: string; model: string };
-type ProviderStatus = { checkedAt: string; providers: Record<string, { state: string; detail?: string; model?: string }> };
 type GitHubUser = { login: string; displayName: string };
 type OnboardingStatus = {
   isOwner: boolean; complete: boolean; phoneConnected: boolean; phone: string | null; pairingPending: boolean;
@@ -26,15 +26,6 @@ type ConciergeSnapshot = {
 };
 
 const money = (amount: number, currency: string) => new Intl.NumberFormat("en-CA", { style: "currency", currency }).format(amount / 100);
-
-const connectionLabel = (state: string) => {
-  if (["sandbox_ready", "configured", "flash_ready", "healthy", "connected"].includes(state)) return "Available";
-  if (state === "not_configured") return "Needs setup";
-  if (state === "disconnected") return "Not connected";
-  return "Unavailable";
-};
-
-const providerLabel = (name: string) => ({ prava: "Checkout", senso: "Memory", gemini: "Product research", linq: "Messages", composio: "Calendar" })[name.toLowerCase()] ?? name;
 
 const factSourceLabel = (source: string) => /^linq\b/i.test(source) ? "From your messages" : "Added in Yukti";
 
@@ -67,13 +58,29 @@ export function YuktiDemo() {
   const [brief, setBrief] = useState<PreparationBrief | null>(null);
   const [briefBusy, setBriefBusy] = useState(false);
   const [briefError, setBriefError] = useState<string | null>(null);
-  const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
-  const [statusBusy, setStatusBusy] = useState(false);
-  const [statusError, setStatusError] = useState<string | null>(null);
   const [concierge, setConcierge] = useState<ConciergeSnapshot | null>(null);
   const [conciergeBusy, setConciergeBusy] = useState(false);
   const [conciergeError, setConciergeError] = useState<string | null>(null);
+  const [workspace, setWorkspace] = useState<WorkspaceSnapshot | null>(null);
+  const [workspaceBusy, setWorkspaceBusy] = useState(false);
+  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const candidate = approvedProduct ?? seedCandidates.find((item) => item.id === selectedCandidate) ?? seedCandidates[0];
+  const ownerTasks = workspace?.tasks.filter((task) => !["dismissed", "completed"].includes(task.status)) ?? [];
+  const ownerEvents = [
+    ...seedEvents.filter((event) => event.id === "evt-sarah" || !workspace || ownerTasks.some((task) => task.title === event.title)),
+    ...ownerTasks.filter((task) => !["Passport renewal", "Dentist follow-up", "Sarah's birthday dinner"].includes(task.title)).map((task) => ({
+      id: task.id,
+      day: new Date(task.startsAt).toLocaleDateString([], { weekday: "short" }),
+      date: String(new Date(task.startsAt).getDate()).padStart(2, "0"),
+      title: task.title,
+      time: new Date(task.startsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
+      person: task.personName ?? "You",
+      state: task.requiredQuestion && !task.answer ? "Needs one answer" : task.status === "watching" ? "Watching" : task.status.replace(/_/g, " "),
+      kind: task.kind ?? "admin",
+    })),
+  ];
+  const selectedWorkspaceTask = ownerTasks.find((task) => task.id === selectedEvent)
+    ?? ownerTasks.find((task) => selectedEvent === "evt-passport" ? task.title === "Passport renewal" : selectedEvent === "evt-dentist" ? task.title === "Dentist follow-up" : false);
 
   useEffect(() => {
     void fetch("/api/me", { cache: "no-store" }).then(async (response) => {
@@ -111,6 +118,46 @@ export function YuktiDemo() {
       setConcierge(result);
     }).catch(() => setConciergeError("Couldn’t load your people right now."));
   }, [user]);
+
+  const loadWorkspace = useCallback(async () => {
+    setWorkspaceBusy(true); setWorkspaceError(null);
+    try {
+      const response = await fetch("/api/workspace", { cache: "no-store" });
+      const result = await response.json() as WorkspaceSnapshot & { error?: string };
+      if (!response.ok || !Array.isArray(result.tasks)) throw new Error(result.error ?? "workspace_unavailable");
+      setWorkspace(result);
+    } catch { setWorkspaceError("Couldn’t load your day right now."); }
+    finally { setWorkspaceBusy(false); }
+  }, []);
+
+  useEffect(() => {
+    if (!user || !onboarding?.complete) return;
+    void fetch("/api/workspace", { cache: "no-store" }).then(async (response) => {
+      const result = await response.json() as WorkspaceSnapshot & { error?: string };
+      if (!response.ok || !Array.isArray(result.tasks)) throw new Error(result.error ?? "workspace_unavailable");
+      setWorkspace(result);
+    }).catch(() => setWorkspaceError("Couldn’t load your day right now."));
+  }, [user, onboarding?.complete]);
+
+  const updateWorkspace = async (path: string, body: Record<string, unknown>) => {
+    setWorkspaceBusy(true); setWorkspaceError(null);
+    try {
+      const response = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "workspace_update_failed");
+      await loadWorkspace(); return true;
+    } catch { setWorkspaceError("That change was not saved. Nothing else was changed."); return false; }
+    finally { setWorkspaceBusy(false); }
+  };
+
+  const syncConnections = async (provider: "calendar" | "gmail" | "all") => {
+    setWorkspaceBusy(true); setWorkspaceError(null);
+    try {
+      const response = await fetch("/api/connections/sync", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ provider }) });
+      if (!response.ok) throw new Error("sync_failed"); await loadWorkspace();
+    } catch { setWorkspaceError("Yukti couldn’t check that source. Your existing tasks are unchanged."); }
+    finally { setWorkspaceBusy(false); }
+  };
 
   const updateConcierge = async (path: string, body: Record<string, unknown>) => {
     setConciergeBusy(true); setConciergeError(null);
@@ -163,24 +210,12 @@ export function YuktiDemo() {
 
   const logout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
-    setUser(null); setOnboarding(null); setConcierge(null); reset();
+    setUser(null); setOnboarding(null); setConcierge(null); setWorkspace(null); reset();
   };
 
   const reset = () => {
     if (sandboxSession) return;
     setView("Today"); setSelectedEvent(seedEvents[0].id); setSelectedCandidate(seedCandidates[0].id); setApprovedProduct(null); setReviewing(false); setApproved(false); setApprovalId(null); setApprovalError(null); setPaymentError(null); setSandboxOutcome(null); setBrief(null); setBriefError(null);
-  };
-
-  const checkProviders = async () => {
-    setStatusBusy(true); setStatusError(null);
-    try {
-      const response = await fetch("/api/status", { method: "POST" });
-      const result = await response.json() as ProviderStatus;
-      if (!response.ok || !result.providers) throw new Error("status_failed");
-      setProviderStatus(result);
-    } catch {
-      setStatusError("Couldn’t check connections right now. Nothing was sent or opened.");
-    } finally { setStatusBusy(false); }
   };
 
   const prepareWithGemini = async () => {
@@ -277,8 +312,8 @@ export function YuktiDemo() {
       <header className="topbar">
         <button className="wordmark" onClick={reset} disabled={Boolean(sandboxSession)} aria-label="Reset Yukti"><span>Y</span> Yukti</button>
         <nav aria-label="Primary navigation">
-          {(["Today", "People", "Wallet", "Audit"] as View[]).map((item) => (
-            <button key={item} className={view === item ? "nav-active" : ""} onClick={() => setView(item)}>{item === "Audit" ? "Activity" : item}</button>
+          {(["Today", "People", "Purchases", "Activity", "Connections"] as View[]).map((item) => (
+            <button key={item} className={view === item ? "nav-active" : ""} onClick={() => setView(item)}>{item}</button>
           ))}
         </nav>
         <div className="auth-control"><span title={user.displayName}>@{user.login}</span><button onClick={logout}>Sign out</button></div>
@@ -290,7 +325,7 @@ export function YuktiDemo() {
             <div className="eyebrow">August 2026</div>
             <h1>Upcoming</h1>
             <div className="event-list">
-              {seedEvents.map((event) => (
+              {ownerEvents.map((event) => (
                 <button key={event.id} className={`event-row ${selectedEvent === event.id ? "selected" : ""}`} onClick={() => setSelectedEvent(event.id)}>
                   <span className="date-tile"><small>{event.day}</small>{event.date}</span>
                   <span className="event-copy"><strong>{event.title}</strong><small>{event.time} · {event.state}</small></span>
@@ -336,12 +371,16 @@ export function YuktiDemo() {
                 </section>
               </>
             ) : (
-              <EmptyEvent eventId={selectedEvent} />
+              <OwnerTask eventId={selectedEvent} task={selectedWorkspaceTask} busy={workspaceBusy} onUpdate={async (body) => {
+                const saved = await updateWorkspace("/api/tasks/update", body);
+                if (saved && ["completed", "dismissed"].includes(String(body.state))) setSelectedEvent("evt-sarah");
+                return saved;
+              }} />
             )}
           </article>
         </section>
-      ) : <MemberToday snapshot={concierge} busy={conciergeBusy} approved={approved} approvedProduct={approvedProduct} approvalId={approvalId} sandboxSession={sandboxSession} sandboxOutcome={sandboxOutcome} paymentBusy={paymentBusy} paymentError={paymentError} onPeople={() => setView("People")} onApproveProduct={approveProduct} onStartPrava={startPrava} onVerifyPrava={verifyPrava} onCancelPrava={cancelPrava} />) : <SecondaryView view={view} providerStatus={providerStatus} statusBusy={statusBusy} statusError={statusError} authenticated={Boolean(user)} onCheckProviders={checkProviders}
-        concierge={concierge} conciergeBusy={conciergeBusy} conciergeError={conciergeError} onReloadConcierge={loadConcierge} onUpdateConcierge={updateConcierge} onScanFlowers={scanFlowers} onApproveProduct={approveProduct} />}
+      ) : <WorkspaceToday snapshot={workspace} busy={workspaceBusy} error={workspaceError} onCreate={(body) => updateWorkspace("/api/tasks", body)} onUpdate={(body) => updateWorkspace("/api/tasks/update", body)} onOpenPeople={() => setView("People")} />) : <SecondaryView view={view} authenticated={Boolean(user)}
+        concierge={concierge} conciergeBusy={conciergeBusy} conciergeError={conciergeError} onReloadConcierge={loadConcierge} onUpdateConcierge={updateConcierge} onScanFlowers={scanFlowers} onApproveProduct={approveProduct} workspace={workspace} workspaceBusy={workspaceBusy} workspaceError={workspaceError} onSyncConnections={syncConnections} />}
 
       {reviewing && (
         <div className="modal-backdrop" role="presentation" onMouseDown={() => setReviewing(false)}>
@@ -457,31 +496,25 @@ function OnboardingFlow({ user, status, onStatus, onComplete, onSignOut }: { use
   </main>;
 }
 
-function MemberToday({ snapshot, busy, approved, approvedProduct, approvalId, sandboxSession, sandboxOutcome, paymentBusy, paymentError, onPeople, onApproveProduct, onStartPrava, onVerifyPrava, onCancelPrava }: { snapshot: ConciergeSnapshot | null; busy: boolean; approved: boolean; approvedProduct: { personName?: string | null; merchant: string; title: string; price: number; currency: string } | null; approvalId: string | null; sandboxSession: SandboxSession | null; sandboxOutcome: SandboxOutcome | null; paymentBusy: boolean; paymentError: string | null; onPeople: () => void; onApproveProduct: (product: ConciergeSnapshot["products"][number]) => Promise<void>; onStartPrava: () => Promise<void>; onVerifyPrava: () => Promise<void>; onCancelPrava: () => Promise<void> }) {
-  if (busy && !snapshot) return <section className="member-today"><p className="page-note">Loading your day…</p></section>;
-  const latest = snapshot?.products[0];
-  const nextRule = snapshot?.rules.find((rule) => Boolean(rule.enabled));
-  return <section className="member-today"><div className="member-today-head"><p className="eyebrow brass">Today</p><h1>{approvedProduct ? "Ready for checkout" : latest ? "One gift is ready to review" : "Nothing needs your approval"}</h1><p>{approvedProduct ? "Check the exact item and amount before opening checkout." : latest ? "Yukti found a current option from your saved reminder." : nextRule ? `Your next ${nextRule.kind} reminder is scheduled for ${new Date(nextRule.nextEligibleAt).toLocaleDateString()}.` : "Add a reminder and Yukti will prepare an option when it is due."}</p></div>
-    {!nextRule && !latest && <div className="today-empty"><div className="large-mark">01</div><h2>Set your first reminder</h2><p>Choose a person, a cadence, and the most Yukti should consider.</p><button className="primary" onClick={onPeople}>Open People</button></div>}
-    {latest && !approvedProduct && <div className="today-product"><LiveProductCard product={latest} busy={busy} onApprove={onApproveProduct} /></div>}
-    {approvedProduct && <section className="approval-envelope member-approval"><div className="fold" aria-hidden="true" /><div><span className="eyebrow">Purchase approval</span><h3>{approvedProduct.title}</h3><p>{approvedProduct.merchant} · {money(approvedProduct.price, approvedProduct.currency)}</p></div><dl><div><dt>For</dt><dd>{approvedProduct.personName || "Your reminder"}</dd></div><div><dt>Expires</dt><dd>In 15 minutes</dd></div><div><dt>Status</dt><dd>{approved ? "Approved" : "Needs approval"}</dd></div></dl>{approvalId && !sandboxSession && <button className="primary" onClick={() => void onStartPrava()} disabled={paymentBusy}>{paymentBusy ? "Opening checkout…" : "Continue to secure checkout"}</button>}{sandboxSession && <div className="sandbox-actions"><a className="primary" href={sandboxSession.checkoutUrl} target="_blank" rel="noreferrer">Open secure checkout</a><button onClick={() => void onVerifyPrava()} disabled={paymentBusy}>Check result</button><button onClick={() => void onCancelPrava()} disabled={paymentBusy}>Cancel session</button></div>}{sandboxOutcome?.state === "pending" && <p className="microcopy">Checkout is still waiting for verification.</p>}{paymentError && <p className="form-error" role="alert">{paymentError}</p>}<p className="microcopy">This approval can be used only once for this merchant, item, and amount.</p></section>}
-  </section>;
+function OwnerTask({ eventId, task, busy, onUpdate }: { eventId: string; task?: WorkspaceSnapshot["tasks"][number]; busy: boolean; onUpdate: (body: Record<string, unknown>) => Promise<boolean> }) {
+  const [answer, setAnswer] = useState("");
+  const passport = eventId === "evt-passport" || task?.title === "Passport renewal";
+  const title = task?.title ?? (passport ? "Passport renewal" : "Dentist follow-up");
+  const question = task?.requiredQuestion ?? (passport ? "Do you have international travel booked in the next six months?" : null);
+  const submit = async (event: React.FormEvent) => { event.preventDefault(); if (task && await onUpdate({ id: task.id, answer })) setAnswer(""); };
+  return <div className="empty-event"><span className="large-mark">{task ? String(new Date(task.startsAt).getDate()).padStart(2, "0") : passport ? "12" : "15"}</span><div className="eyebrow brass">{question && !task?.answer ? "Needs one answer" : "Watching"}</div><h2>{title}</h2><p>{task?.description ?? (passport ? "Confirm your travel plans and Yukti will keep the renewal checklist moving." : "Yukti will keep this appointment visible and surface anything that needs preparation.")}</p>
+    {question && !task?.answer && task && <form className="task-question" onSubmit={submit}><label>{question}<textarea value={answer} onChange={(event) => setAnswer(event.target.value)} maxLength={500} required /></label><button className="primary" disabled={busy}>Save answer</button></form>}
+    {task?.answer && <div className="task-answer"><span>Your answer</span><p>{task.answer}</p></div>}
+    {task && <div className="task-actions"><button onClick={() => void onUpdate({ id: task.id, state: "completed" })} disabled={busy}>Mark complete</button><button onClick={() => void onUpdate({ id: task.id, state: "dismissed" })} disabled={busy}>Dismiss</button>{task.sourceUrl && <a href={task.sourceUrl} target="_blank" rel="noreferrer">Open source</a>}</div>}
+    {!task && <p className="page-note">This task is still loading.</p>}
+  </div>;
 }
 
-function EmptyEvent({ eventId }: { eventId: string }) {
-  const passport = eventId === "evt-passport";
-  return <div className="empty-event"><span className="large-mark">{passport ? "12" : "15"}</span><div className="eyebrow brass">{passport ? "Needs one answer" : "Watching"}</div><h2>{passport ? "Passport renewal needs your travel date." : "Nothing to do yet."}</h2><p>{passport ? "Yukti can prepare the renewal checklist after you confirm whether international travel is booked in the next six months." : "Yukti will remind you if anything needs your attention before the appointment."}</p><p className="page-note">{passport ? "Add your travel details whenever you are ready." : "No action is needed yet."}</p></div>;
-}
-
-function SecondaryView({ view, providerStatus, statusBusy, statusError, authenticated, onCheckProviders, concierge, conciergeBusy, conciergeError, onReloadConcierge, onUpdateConcierge, onScanFlowers, onApproveProduct }: { view: Exclude<View, "Today">; providerStatus: ProviderStatus | null; statusBusy: boolean; statusError: string | null; authenticated: boolean; onCheckProviders: () => void; concierge: ConciergeSnapshot | null; conciergeBusy: boolean; conciergeError: string | null; onReloadConcierge: () => Promise<void>; onUpdateConcierge: (path: string, body: Record<string, unknown>) => Promise<unknown>; onScanFlowers: (send: boolean) => Promise<void>; onApproveProduct: (product: ConciergeSnapshot["products"][number]) => Promise<void> }) {
+function SecondaryView({ view, authenticated, concierge, conciergeBusy, conciergeError, onReloadConcierge, onUpdateConcierge, onScanFlowers, onApproveProduct, workspace, workspaceBusy, workspaceError, onSyncConnections }: { view: Exclude<View, "Today">; authenticated: boolean; concierge: ConciergeSnapshot | null; conciergeBusy: boolean; conciergeError: string | null; onReloadConcierge: () => Promise<void>; onUpdateConcierge: (path: string, body: Record<string, unknown>) => Promise<unknown>; onScanFlowers: (send: boolean) => Promise<void>; onApproveProduct: (product: ConciergeSnapshot["products"][number]) => Promise<void>; workspace: WorkspaceSnapshot | null; workspaceBusy: boolean; workspaceError: string | null; onSyncConnections: (provider: "calendar" | "gmail" | "all") => Promise<void> }) {
   if (view === "People") return <PeopleView snapshot={concierge} busy={conciergeBusy} error={conciergeError} authenticated={authenticated} onReload={onReloadConcierge} onUpdate={onUpdateConcierge} onScan={onScanFlowers} onApproveProduct={onApproveProduct} />;
-  if (view === "Wallet") return <section className="secondary-page"><h1>Wallet</h1><div className="ledger-zero"><strong>$0.00</strong><span>spent through Yukti</span></div><p className="page-note">Payment details are requested in checkout, after you approve a specific purchase.</p></section>;
-  const connectCalendar = async () => {
-    const response = await fetch("/api/onboarding/calendar", { method: "POST" });
-    const result = await response.json() as { redirectUrl?: string };
-    if (response.ok && result.redirectUrl) window.location.assign(result.redirectUrl);
-  };
-  return <section className="secondary-page"><h1>Activity</h1><div className="connection-check"><div><strong>Connections</strong><p>Check messaging, memory, product search, calendar, and checkout. This will not send a message or open checkout.</p></div><button className="secondary" onClick={onCheckProviders} disabled={statusBusy || !authenticated}>{statusBusy ? "Checking…" : "Check connections"}</button></div>{statusError && <p className="inline-error" role="alert">{statusError}</p>}{providerStatus && <div className="provider-grid" aria-live="polite">{Object.entries(providerStatus.providers).map(([name, status]) => <div key={name}><span>{providerLabel(name)}</span><strong>{connectionLabel(status.state)}</strong>{name === "composio" && status.state !== "connected" && <button onClick={() => void connectCalendar()}>Connect calendar</button>}{status.detail && status.detail.toLowerCase() !== status.state.toLowerCase() && status.detail.toLowerCase() !== "healthy" && <small>{status.detail}</small>}</div>)}</div>}<div className="audit-list">{concierge?.activity.map((item) => <div key={`${item.createdAt}-${item.kind}`}><time>{new Date(item.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</time><span><strong>{activityLabel(item.kind)}</strong><small>{activityDetail(item.kind, item.detail)}</small></span></div>)}{!concierge?.activity.length && <p className="page-note">Your approvals, memory changes, and checkout results will appear here.</p>}</div></section>;
+  if (view === "Purchases") return <PurchasesView snapshot={workspace} />;
+  if (view === "Connections") return <ConnectionsView snapshot={workspace} busy={workspaceBusy} error={workspaceError} onSync={onSyncConnections} />;
+  return <section className="secondary-page"><div className="activity-heading"><h1>Activity</h1><p>A record of changes and approvals in your account.</p></div><div className="audit-list">{concierge?.activity.map((item) => <div key={`${item.createdAt}-${item.kind}`}><time>{new Date(item.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</time><span><strong>{activityLabel(item.kind)}</strong><small>{activityDetail(item.kind, item.detail)}</small></span></div>)}{!concierge?.activity.length && <p className="page-note">Your approvals, memory changes, and checkout results will appear here.</p>}</div></section>;
 }
 
 function PeopleView({ snapshot, busy, error, authenticated, onReload, onUpdate, onScan, onApproveProduct }: { snapshot: ConciergeSnapshot | null; busy: boolean; error: string | null; authenticated: boolean; onReload: () => Promise<void>; onUpdate: (path: string, body: Record<string, unknown>) => Promise<unknown>; onScan: (send: boolean) => Promise<void>; onApproveProduct: (product: ConciergeSnapshot["products"][number]) => Promise<void> }) {

@@ -9,6 +9,8 @@ import { beginGitHubLogin, finishGitHubLogin, logoutGitHub, sha256 } from "./git
 import { consumeRateLimit, guardProviderUse, RateLimitError, requireSameOrigin } from "./rate-limit";
 import { handleConciergeRequest, handleLinqWebhook } from "./concierge-handler";
 import { handleOnboardingRequest, onboardingStatus } from "./onboarding-handler";
+import { handleWorkspaceRequest } from "./workspace-handler";
+import { handleScheduledJob } from "./scheduler-handler";
 import type { RequestIdentity } from "./identity";
 
 type RuntimeEnv = {
@@ -27,6 +29,8 @@ type RuntimeEnv = {
   COMPOSIO_API_KEY?: string;
   COMPOSIO_USER_ID?: string;
   COMPOSIO_GOOGLE_CALENDAR_AUTH_CONFIG_ID?: string;
+  COMPOSIO_GMAIL_AUTH_CONFIG_ID?: string;
+  YUKTI_SCHEDULER_SECRET?: string;
   GITHUB_CLIENT_ID?: string;
   GITHUB_CLIENT_SECRET?: string;
   GITHUB_CALLBACK_URL?: string;
@@ -78,6 +82,8 @@ export async function handleYuktiApi(request: Request, env: RuntimeEnv): Promise
       return reply({ user: { login: identity.login, displayName: identity.displayName }, onboarding: await onboardingStatus(env, identity) }, 200);
     }
     if (url.pathname === "/api/webhooks/linq" && request.method === "POST") return handleLinqWebhook(request, env);
+    const scheduledResponse = await handleScheduledJob(request, env);
+    if (scheduledResponse) return scheduledResponse;
     if (request.method !== "POST" && request.method !== "GET") return reply({ error: "method_not_allowed" }, 405);
     if (request.method === "POST") {
       const originError = requireSameOrigin(request, env.YUKTI_MODE);
@@ -92,6 +98,8 @@ export async function handleYuktiApi(request: Request, env: RuntimeEnv): Promise
     if (onboardingResponse) return onboardingResponse;
     const conciergeResponse = await handleConciergeRequest(request, env, identity);
     if (conciergeResponse) return conciergeResponse;
+    const workspaceResponse = await handleWorkspaceRequest(request, env, identity);
+    if (workspaceResponse) return workspaceResponse;
     if (request.method !== "POST") return reply({ error: "not_found" }, 404);
     if (url.pathname === "/api/approvals") {
       await consumeRateLimit(env.DB, "approval", identity.id, 20, 60 * 60_000);
@@ -132,6 +140,9 @@ async function providerStatus(env: RuntimeEnv, identity: RequestIdentity) {
   const composio = env.COMPOSIO_API_KEY
     ? await safeCheck(() => new ComposioClient(env.COMPOSIO_API_KEY!).calendarConnection(composioUserId(env, identity)))
     : { ok: false as const, reason: "not_configured" };
+  const gmail = env.COMPOSIO_API_KEY
+    ? await safeCheck(() => new ComposioClient(env.COMPOSIO_API_KEY!).gmailConnection(composioUserId(env, identity)))
+    : { ok: false as const, reason: "not_configured" };
 
   return reply({
     checkedAt: new Date().toISOString(),
@@ -141,6 +152,7 @@ async function providerStatus(env: RuntimeEnv, identity: RequestIdentity) {
       gemini: { state: env.GEMINI_API_KEY && /gemini-[\w.-]*flash[\w.-]*$/i.test(env.GEMINI_MODEL ?? "gemini-3.6-flash") ? "flash_ready" : "not_configured", model: env.GEMINI_MODEL ?? "gemini-3.6-flash" },
       linq: linq.ok ? { state: linq.value.configured ? "healthy" : "not_configured", detail: linq.value.status } : { state: "unavailable" },
       composio: composio.ok && composio.value.connected ? { state: "connected" } : { state: "disconnected", detail: "Calendar permission needed" },
+      gmail: gmail.ok && gmail.value.connected ? { state: "connected" } : { state: "disconnected", detail: "Email permission is optional" },
     },
   }, 200);
 }
@@ -369,6 +381,8 @@ async function seedOwnerDemoData(db: D1Database, identity: { id: string; display
   const eventId = scoped(identity.id, "evt-sarah");
   const personId = scoped(identity.id, "person-sarah");
   const planId = scoped(identity.id, "plan-sarah");
+  const passportId = scoped(identity.id, "evt-passport");
+  const dentistId = scoped(identity.id, "evt-dentist");
   const rows: Array<[string, unknown[]]> = [
     ["INSERT OR IGNORE INTO users (id, chatgpt_user_id, display_name, timezone, created_at, updated_at) VALUES (?, ?, ?, 'America/Vancouver', ?, ?)", [identity.id, identity.id, identity.displayName, now, now]],
     ["INSERT OR IGNORE INTO people (id, user_id, name, relationship, notes, created_at, updated_at) VALUES (?, ?, 'Sarah', 'Friend', 'Saved relationship context', ?, ?)", [personId, identity.id, now, now]],
@@ -376,6 +390,10 @@ async function seedOwnerDemoData(db: D1Database, identity: { id: string; display
     ["INSERT OR IGNORE INTO preparation_plans (id, event_id, state, deadline_at, summary, created_at, updated_at) VALUES (?, ?, 'ready_for_approval', ?, 'Choose one useful birthday gift.', ?, ?)", [planId, eventId, "2026-08-02T23:59:00-07:00", now, now]],
     ["INSERT OR IGNORE INTO candidates (id, plan_id, merchant, title, amount_minor, currency, url, evidence, created_at, updated_at) VALUES (?, ?, 'Granville Tea Co.', 'Jasmine tea tasting set', 4200, 'CAD', 'https://example.com/yukti-sandbox/tea', 'Saved relationship memory', ?, ?)", [scoped(identity.id, "cand-tea"), planId, now, now]],
     ["INSERT OR IGNORE INTO candidates (id, plan_id, merchant, title, amount_minor, currency, url, evidence, created_at, updated_at) VALUES (?, ?, 'Paper Hound', 'The Art of Still Life', 3800, 'CAD', 'https://example.com/yukti-sandbox/book', 'Saved relationship memory', ?, ?)", [scoped(identity.id, "cand-book"), planId, now, now]],
+    ["INSERT OR IGNORE INTO events (id, user_id, person_id, title, starts_at, source, status, created_at, updated_at) VALUES (?, ?, NULL, 'Passport renewal', '2026-08-12T12:00:00-07:00', 'manual', 'needs_answer', ?, ?)", [passportId, identity.id, now, now]],
+    ["INSERT OR IGNORE INTO task_details (event_id, user_id, kind, description, action_state, required_question, answer, location, external_id, source_url, created_at, updated_at) VALUES (?, ?, 'admin', 'Prepare a renewal checklist around any upcoming international travel.', 'needs_answer', 'Do you have international travel booked in the next six months?', NULL, NULL, NULL, NULL, ?, ?)", [passportId, identity.id, now, now]],
+    ["INSERT OR IGNORE INTO events (id, user_id, person_id, title, starts_at, source, status, created_at, updated_at) VALUES (?, ?, NULL, 'Dentist follow-up', '2026-08-15T10:30:00-07:00', 'manual', 'watching', ?, ?)", [dentistId, identity.id, now, now]],
+    ["INSERT OR IGNORE INTO task_details (event_id, user_id, kind, description, action_state, required_question, answer, location, external_id, source_url, created_at, updated_at) VALUES (?, ?, 'appointment', 'Keep the appointment visible and surface preparation only if needed.', 'watching', NULL, NULL, NULL, NULL, NULL, ?, ?)", [dentistId, identity.id, now, now]],
   ];
   rows.push(["UPDATE users SET onboarding_completed_at = COALESCE(onboarding_completed_at, ?), updated_at = ? WHERE id = ?", [now, now, identity.id]]);
   if (ownerPhone) rows.push(["INSERT OR IGNORE INTO concierge_profiles (user_id, phone_e164, proactive_enabled, quiet_start_hour, quiet_end_hour, created_at, updated_at) VALUES (?, ?, 1, 21, 8, ?, ?)", [identity.id, ownerPhone, now, now]]);

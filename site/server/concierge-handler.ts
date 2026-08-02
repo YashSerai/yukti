@@ -63,7 +63,27 @@ export async function handleLinqWebhook(request: Request, env: ConciergeEnv) {
     VALUES (?, ?, ?, ?, ?, 'inbound', ?, 'processing', ?, ?)`)
     .bind(messageId, owner.id, conversationId, event.event_id, event.data.id, text, now, now).run();
 
-  const parsed = parseConciergeMessage(text);
+  let parsed = parseConciergeMessage(text);
+  let reply = conciergeReply(parsed);
+  if (env.GEMINI_API_KEY && !parsed.optOut) {
+    try {
+      const pending = await loadConversationState(env.DB, owner.id);
+      const understood = await new GeminiFlashClient(env.GEMINI_API_KEY, env.GEMINI_MODEL).understandConciergeMessage(text, pending ?? undefined);
+      const merged = mergeUnderstanding(understood, pending);
+      const expanded = parsedFromUnderstanding(merged);
+      parsed = { facts: dedupeLearned([...parsed.facts, ...expanded.facts]), rule: parsed.rule ?? expanded.rule, optOut: false };
+      const missing = missingForIntent(merged);
+      if (missing.length) {
+        await saveConversationState(env.DB, owner.id, merged, missing, now);
+        reply = clarificationReply(merged.personName, missing[0]);
+      } else {
+        await env.DB.prepare("DELETE FROM conversation_states WHERE user_id = ?").bind(owner.id).run();
+        reply = conciergeReply(parsed);
+        if (merged.intent === "gift" && merged.personName) reply = `I have what I need for ${merged.personName}. I’ll check a current option and save it in Yukti for your approval.`;
+        if (merged.intent === "task" && merged.taskTitle && merged.taskDate) await persistMessageTask(env.DB, owner.id, merged.taskTitle, merged.taskDate, now);
+      }
+    } catch { /* Deterministic interpretation remains available when the model is unavailable. */ }
+  }
   for (const learned of parsed.facts) await persistFact(env.DB, owner.id, learned, messageId, event.event_id, now);
   if (parsed.rule) await persistRule(env.DB, owner.id, parsed.rule, now);
   if (parsed.optOut) await env.DB.batch([
@@ -72,7 +92,6 @@ export async function handleLinqWebhook(request: Request, env: ConciergeEnv) {
   ]);
   await env.DB.prepare(`UPDATE messages SET processing_state = 'processed', updated_at = ? WHERE id = ?`).bind(new Date().toISOString(), messageId).run();
 
-  const reply = conciergeReply(parsed);
   if (env.LINQ_API_TOKEN) {
     try {
       const sent = await new LinqClient(env.LINQ_API_TOKEN, env.LINQ_PHONE_NUMBER).sendApprovedMessage(phone, reply);
@@ -88,6 +107,68 @@ export async function handleLinqWebhook(request: Request, env: ConciergeEnv) {
   return json({ accepted: true, learned: parsed.facts.length, ruleCreated: Boolean(parsed.rule) }, 200);
 }
 
+type PendingState = { intent?: string | null; personName?: string | null; collected?: Record<string, unknown> };
+type Understanding = { intent: string; personName: string | null; relationship: string | null; preference: string | null; location: string | null; budgetMinor: number | null; cadenceDays: number | null; taskTitle: string | null; taskDate: string | null };
+
+async function loadConversationState(db: D1Database, userId: string): Promise<PendingState | null> {
+  const row = await db.prepare("SELECT intent, person_name AS personName, collected, expires_at AS expiresAt FROM conversation_states WHERE user_id = ?").bind(userId).first<{ intent: string | null; personName: string | null; collected: string; expiresAt: string }>();
+  if (!row || Date.parse(row.expiresAt) <= Date.now()) { if (row) await db.prepare("DELETE FROM conversation_states WHERE user_id = ?").bind(userId).run(); return null; }
+  try { return { intent: row.intent, personName: row.personName, collected: JSON.parse(row.collected) as Record<string, unknown> }; } catch { return null; }
+}
+function mergeUnderstanding(current: Understanding, pending: PendingState | null): Understanding {
+  const saved = pending?.collected ?? {};
+  const pickString = (key: keyof Understanding) => (current[key] as string | null) || (typeof saved[key] === "string" ? saved[key] as string : null);
+  const pickNumber = (key: keyof Understanding) => (current[key] as number | null) ?? (typeof saved[key] === "number" ? saved[key] as number : null);
+  return { intent: current.intent === "unknown" ? pending?.intent ?? "unknown" : current.intent, personName: current.personName || pending?.personName || pickString("personName"), relationship: pickString("relationship"), preference: pickString("preference"), location: pickString("location"), budgetMinor: pickNumber("budgetMinor"), cadenceDays: pickNumber("cadenceDays"), taskTitle: pickString("taskTitle"), taskDate: pickString("taskDate") };
+}
+function parsedFromUnderstanding(value: Understanding) {
+  const facts: Array<{ personName: string; kind: "relationship" | "preference" | "budget" | "location"; value: string; origin: "explicit"; confidence: number }> = [];
+  if (value.personName) {
+    if (value.relationship) facts.push({ personName: value.personName, kind: "relationship", value: value.relationship, origin: "explicit", confidence: 100 });
+    if (value.preference) facts.push({ personName: value.personName, kind: "preference", value: value.preference, origin: "explicit", confidence: 100 });
+    if (value.location) facts.push({ personName: value.personName, kind: "location", value: value.location, origin: "explicit", confidence: 100 });
+    if (value.budgetMinor != null) facts.push({ personName: value.personName, kind: "budget", value: `${value.budgetMinor} USD`, origin: "explicit", confidence: 100 });
+  }
+  const rule = value.personName && ["gift", "recurring_gift"].includes(value.intent) && value.budgetMinor != null
+    ? { personName: value.personName, cadenceDays: value.intent === "recurring_gift" ? value.cadenceDays ?? 28 : 365, maximumAmountMinor: value.budgetMinor, currency: "USD" as const, kind: value.intent === "gift" ? "one_time_gift" : "flowers" } : undefined;
+  return { facts, rule };
+}
+function missingForIntent(value: Understanding) {
+  if (value.intent === "gift" || value.intent === "recurring_gift") {
+    const missing: string[] = [];
+    if (!value.personName) missing.push("person");
+    if (!value.preference) missing.push("preference");
+    if (!value.location) missing.push("location");
+    if (value.budgetMinor == null) missing.push("budget");
+    if (value.intent === "recurring_gift" && !value.cadenceDays) missing.push("cadence");
+    return missing;
+  }
+  if (value.intent === "task") return [!value.taskTitle ? "task" : null, !value.taskDate ? "date" : null].filter((item): item is string => Boolean(item));
+  return [];
+}
+async function saveConversationState(db: D1Database, userId: string, value: Understanding, missing: string[], now: string) {
+  const expiresAt = new Date(Date.parse(now) + 24 * 60 * 60_000).toISOString();
+  await db.prepare(`INSERT INTO conversation_states (user_id, person_name, intent, missing_fields, collected, expires_at, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET person_name = excluded.person_name, intent = excluded.intent, missing_fields = excluded.missing_fields, collected = excluded.collected, expires_at = excluded.expires_at, updated_at = excluded.updated_at`)
+    .bind(userId, value.personName, value.intent, JSON.stringify(missing), JSON.stringify(value), expiresAt, now, now).run();
+}
+function clarificationReply(personName: string | null, field: string) {
+  const who = personName ? ` for ${personName}` : "";
+  return ({ person: "Who is this for?", preference: `What do they like${who}?`, location: `Where should it be delivered${who}? A city or postal code is enough.`, budget: `What is the most I should consider spending${who}?`, cadence: `How often should I prepare this${who}?`, date: "When should I remind you?", task: "What should I help you prepare?" } as Record<string, string>)[field] ?? "What detail should I use?";
+}
+async function persistMessageTask(db: D1Database, userId: string, title: string, rawDate: string, now: string) {
+  const startsAt = !Number.isNaN(Date.parse(rawDate)) ? new Date(rawDate).toISOString() : null;
+  if (!startsAt) return;
+  const existing = await db.prepare("SELECT id FROM events WHERE user_id = ? AND title = ? AND starts_at = ?").bind(userId, title, startsAt).first();
+  if (existing) return;
+  const id = crypto.randomUUID();
+  await db.batch([
+    db.prepare("INSERT INTO events (id, user_id, person_id, title, starts_at, source, status, created_at, updated_at) VALUES (?, ?, NULL, ?, ?, 'linq', 'watching', ?, ?)").bind(id, userId, title, startsAt, now, now),
+    db.prepare("INSERT INTO task_details (event_id, user_id, kind, description, action_state, required_question, answer, location, external_id, source_url, created_at, updated_at) VALUES (?, ?, 'admin', 'Added from your message.', 'watching', NULL, NULL, NULL, NULL, NULL, ?, ?)").bind(id, userId, now, now),
+  ]);
+}
+function dedupeLearned<T extends { personName: string; kind: string; value: string }>(items: T[]) { return items.filter((item, index) => items.findIndex((other) => other.personName.toLowerCase() === item.personName.toLowerCase() && other.kind === item.kind && other.value.toLowerCase() === item.value.toLowerCase()) === index); }
+
 export async function handleConciergeRequest(request: Request, env: ConciergeEnv, identity: RequestIdentity): Promise<Response | null> {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/api/concierge")) return null;
@@ -99,7 +180,10 @@ export async function handleConciergeRequest(request: Request, env: ConciergeEnv
   if (url.pathname === "/api/concierge/facts/delete" && request.method === "POST") return deleteFact(request, env.DB, identity.id, now);
   if (url.pathname === "/api/concierge/rules" && request.method === "POST") return createRule(request, env.DB, identity.id, now);
   if (url.pathname === "/api/concierge/rules/toggle" && request.method === "POST") return toggleRule(request, env.DB, identity.id, now);
-  if (url.pathname === "/api/concierge/scan" && request.method === "POST") return scanForFlowers(request, env, identity.id, now);
+  if (url.pathname === "/api/concierge/scan" && request.method === "POST") {
+    const body = await bodyJson(request);
+    return prepareDueFlowerRule(env, identity.id, now, body.send === true);
+  }
   return json({ error: "not_found" }, 404);
 }
 
@@ -157,10 +241,9 @@ async function toggleRule(request: Request, db: D1Database, userId: string, now:
   return (result.meta.changes ?? 0) === 1 ? json({ saved: true }, 200) : json({ error: "rule_not_found" }, 404);
 }
 
-async function scanForFlowers(request: Request, env: ConciergeEnv, userId: string, now: string) {
-  const body = await bodyJson(request); const send = body.send === true;
-  const rule = await env.DB.prepare(`SELECT r.id, r.person_id, p.name AS person_name, r.cadence_days, r.maximum_amount_minor, r.currency FROM proactive_rules r JOIN people p ON p.id = r.person_id WHERE r.user_id = ? AND r.enabled = 1 AND r.next_eligible_at <= ? ORDER BY r.next_eligible_at LIMIT 1`)
-    .bind(userId, now).first<{ id: string; person_id: string; person_name: string; cadence_days: number; maximum_amount_minor: number; currency: string }>();
+export async function prepareDueFlowerRule(env: ConciergeEnv, userId: string, now: string, send: boolean) {
+  const rule = await env.DB.prepare(`SELECT r.id, r.person_id, r.kind, p.name AS person_name, r.cadence_days, r.maximum_amount_minor, r.currency FROM proactive_rules r JOIN people p ON p.id = r.person_id WHERE r.user_id = ? AND r.enabled = 1 AND r.next_eligible_at <= ? ORDER BY r.next_eligible_at LIMIT 1`)
+    .bind(userId, now).first<{ id: string; person_id: string; kind: string; person_name: string; cadence_days: number; maximum_amount_minor: number; currency: string }>();
   if (!rule) return json({ state: "nothing_due" }, 200);
   let products;
   try { products = await fetchFlowerProducts(rule.maximum_amount_minor); }
@@ -200,7 +283,7 @@ async function scanForFlowers(request: Request, env: ConciergeEnv, userId: strin
     .bind(snapshotId, userId, rule.id, selected.merchant, selected.merchantProductId, selected.title, selected.amountMinor, selected.currency, selected.url, selected.imageUrl, selected.availability, evidence, selected.retrievedAt, now, now).run();
   if (send) {
     const nextEligibleAt = new Date(Date.parse(now) + rule.cadence_days * 86_400_000).toISOString();
-    await env.DB.prepare(`UPDATE proactive_rules SET last_prepared_at = ?, next_eligible_at = ?, updated_at = ? WHERE id = ? AND user_id = ?`).bind(now, nextEligibleAt, now, rule.id, userId).run();
+    await env.DB.prepare(`UPDATE proactive_rules SET last_prepared_at = ?, next_eligible_at = ?, enabled = ?, updated_at = ? WHERE id = ? AND user_id = ?`).bind(now, nextEligibleAt, rule.kind === "one_time_gift" ? 0 : 1, now, rule.id, userId).run();
   } else {
     await env.DB.prepare(`UPDATE proactive_rules SET last_prepared_at = ?, updated_at = ? WHERE id = ? AND user_id = ?`).bind(now, now, rule.id, userId).run();
   }
@@ -210,7 +293,7 @@ async function scanForFlowers(request: Request, env: ConciergeEnv, userId: strin
   if (send && env.LINQ_API_TOKEN && env.LINQ_PHONE_NUMBER && profile?.phone) {
     const amount = (selected.amountMinor / 100).toFixed(0);
     await new LinqClient(env.LINQ_API_TOKEN, env.LINQ_PHONE_NUMBER).sendApprovedMessage(profile.phone,
-      `It has been a while since you planned flowers for ${rule.person_name}. I found ${selected.title} at ${selected.merchant}, starting at $${amount} USD. I saved the live option in Yukti for you to review.`);
+      `${rule.kind === "one_time_gift" ? `I found an option for ${rule.person_name}` : `It has been a while since you planned flowers for ${rule.person_name}`}: ${selected.title} at ${selected.merchant}, starting at $${amount} USD. I saved the live option in Yukti for you to review.`);
     messageSent = true;
   }
   return json({ state: "prepared", product: { id: snapshotId, ...selected, evidence: JSON.parse(evidence) }, messageSent }, 200);
@@ -226,12 +309,13 @@ async function persistFact(db: D1Database, userId: string, learned: { personName
     .bind(crypto.randomUUID(), userId, personId, sentence, learned.kind, learned.value, learned.origin, sourceMessageId, `Linq ${sourceEventId.slice(0, 8)}`, learned.confidence, now, now).run();
 }
 
-async function persistRule(db: D1Database, userId: string, rule: { personName: string; cadenceDays: number; maximumAmountMinor: number; currency: string }, now: string) {
+async function persistRule(db: D1Database, userId: string, rule: { personName: string; cadenceDays: number; maximumAmountMinor: number; currency: string; kind?: string }, now: string) {
   const personId = await ensurePerson(db, userId, rule.personName, "Someone you care about", now);
-  const existing = await db.prepare(`SELECT id FROM proactive_rules WHERE user_id = ? AND person_id = ? AND kind = 'flowers'`).bind(userId, personId).first<{ id: string }>();
+  const kind = rule.kind === "one_time_gift" ? "one_time_gift" : "flowers";
+  const existing = await db.prepare(`SELECT id FROM proactive_rules WHERE user_id = ? AND person_id = ? AND kind = ?`).bind(userId, personId, kind).first<{ id: string }>();
   if (existing) return db.prepare(`UPDATE proactive_rules SET cadence_days = ?, maximum_amount_minor = ?, currency = ?, enabled = 1, next_eligible_at = ?, updated_at = ? WHERE id = ?`).bind(rule.cadenceDays, rule.maximumAmountMinor, rule.currency, now, now, existing.id).run();
-  return db.prepare(`INSERT INTO proactive_rules (id, user_id, person_id, kind, cadence_days, maximum_amount_minor, currency, enabled, next_eligible_at, last_prepared_at, created_at, updated_at) VALUES (?, ?, ?, 'flowers', ?, ?, ?, 1, ?, NULL, ?, ?)`)
-    .bind(crypto.randomUUID(), userId, personId, rule.cadenceDays, rule.maximumAmountMinor, rule.currency, now, now, now).run();
+  return db.prepare(`INSERT INTO proactive_rules (id, user_id, person_id, kind, cadence_days, maximum_amount_minor, currency, enabled, next_eligible_at, last_prepared_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, NULL, ?, ?)`)
+    .bind(crypto.randomUUID(), userId, personId, kind, rule.cadenceDays, rule.maximumAmountMinor, rule.currency, now, now, now).run();
 }
 
 async function ensurePerson(db: D1Database, userId: string, rawName: string, relationship: string, now: string) {
