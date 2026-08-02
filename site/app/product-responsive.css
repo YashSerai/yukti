@@ -4,7 +4,7 @@
   .landing-nav nav a:first-child { display:none; }
   .landing-hero { min-height:auto; grid-template-columns:1fr; }
   .landing-copy { padding:70px 22px 55px; }
-  .landing-copy h1 { font-size:58px; }
+  .landing-copy h1 { font-size:50px; line-height:.96; }
   .landing-actions { align-items:flex-start; flex-direction:column; }
   .gift-still { min-height:500px; }
   .gift-box { width:60%; height:230px; }
