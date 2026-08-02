@@ -8,7 +8,7 @@ Finish production visual QA, record the final demo against the current release, 
 
 ## Active slice
 
-Release gate after the local implementation and provider-integration slices.
+Release gate after the Calendar preparation and provider-integration slices.
 
 ## Completed todos
 
@@ -29,7 +29,7 @@ Release gate after the local implementation and provider-integration slices.
 - Composio Calendar is connected as `yukti-owner` after the user explicitly approved the disclosed Google Calendar scopes
 - App-owned GitHub OAuth replaces the unreliable Sign in with ChatGPT dependency for sponsor actions; GitHub grants public-profile access only
 - PKCE, single-use login state, hashed sessions, same-origin mutation checks, per-user and global quotas, provider timeouts, and response hardening protect shared keys
-- Typecheck, lint, 47 tests, rendered-output test, and production build pass
+- Typecheck, lint, 49 tests, rendered-output test, and production build pass
 - Exact-value secret scan reports zero hits in tracked source and built output
 - Canonical Sites production release published at `https://yukti.yashns.chatgpt.site`; the previous project remains available as rollback
 - Hosted Senso retrieval, Gemini brief, D1 approval, Prava sandbox creation, and Prava revocation verified end to end
@@ -44,9 +44,12 @@ Release gate after the local implementation and provider-integration slices.
 - General tasks support questions, saved answers, status changes, completion, and dismissal
 - Contextual Linq messaging extracts only explicit relationship facts and asks follow-up questions when information is missing
 - An hourly GitHub Actions worker checks due flower rules with quiet hours and idempotency; production dry-run `30742489798` passed
+- Connected Google Calendars now refresh once a day through the same user-scoped path as the Calendar page's `Refresh now` action
+- New or changed Calendar events receive a bounded Gemini preparation note and, when useful, one follow-up question; unchanged events are fingerprinted so they do not spend model credits again
 - Purchases replaces the old Wallet label and provides a durable approval and transaction ledger
 - Gmail was deliberately removed from the product, provider setup, and deployment configuration; Calendar is the only background source
-- Sites version 28 is live from commit `15c600c`; final desktop and 390 px production QA covered signed-out, Today, task, People, Purchases, Activity, and Calendar surfaces with no browser errors
+- Sites version 29 is live from commit `3ee0967`; production owner QA verified the revised Calendar copy, a successful manual refresh, and an updated `Last checked` time with no application errors
+- Production scheduler dry-run `30764879226` passed against version 29 and reported zero due Calendar accounts immediately after the manual refresh, plus zero due flower reminders
 - The owner demo ledger is clean, generated reminder shells are removed, and Sarah's active flower rule next scans on August 28
 - README, submission copy, demo script, eligibility checklist, and real-versus-simulated disclosure are current
 
@@ -60,7 +63,7 @@ Release gate after the local implementation and provider-integration slices.
 
 ## Blockers
 
-Prava's hosted sandbox is still provider-pending after the submitted test card. The matching dashboard order remains `Pending`, so scoped credential issuance and final status reporting do not yet have attended production evidence. The final demo recording, upload, and Devfolio submission remain open.
+Prava's hosted sandbox is still provider-pending after the submitted test card. The matching dashboard order remains `Pending`, so scoped credential issuance and final status reporting do not yet have attended production evidence. No new or changed owner Calendar event was available during version 29 QA, so event-specific Gemini enrichment is automated-test and deployed-path verified but not yet captured in an attended production screenshot. The final demo recording, upload, and Devfolio submission remain open.
 
 ## Next step
 
