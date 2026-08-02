@@ -58,4 +58,6 @@ Runtime credentials belong in ignored local environment files or Sites secrets. 
 - [Eligibility checklist](docs/eligibility.md)
 - [Real versus simulated](docs/real-versus-simulated.md)
 - [Submission copy](SUBMISSION.md)
+- [Devfolio package](docs/devfolio-package.md)
+- [Launch posts](docs/launch-posts.md)
 - [Architecture decision](docs/adr/0001-hosting-boundary.md)

@@ -1,0 +1,97 @@
+# Devfolio submission package
+
+This file is the copy-and-paste source for the final Devfolio entry. It is not a substitute for selecting **Publish Project** and confirming the status reads **Submitted**.
+
+## Core fields
+
+**Project name:** Yukti
+
+**Tagline:** The gifting concierge that remembers the person and asks before it buys.
+
+**Product link:** <https://yukti.yashns.chatgpt.site>
+
+**Repository:** <https://github.com/YashSerai/yukti>
+
+**Demo video:** Upload `yukti-demo-silent.mp4` as an unlisted YouTube video, then paste the URL here.
+
+## Problem statement
+
+Buying a thoughtful gift means remembering the person, the occasion, their preferences, a sensible budget, delivery constraints, and what is actually available now. Calendar reminders preserve the date but leave the work untouched. Generic shopping agents have the opposite problem: they can act quickly without making the user's exact authority clear.
+
+## Project description
+
+Yukti is a relationship-aware gifting concierge that begins in iMessage and stops at an explicit spend boundary.
+
+A user can text Yukti through Linq with facts such as who Sarah is, what she likes, their preferred budget, location, and gifting cadence. Yukti turns those messages into editable person memory, retrieves the relevant context through Senso, and uses Gemini 3.6 Flash to inspect a current merchant page. The user sees the source beside the option and approves one exact merchant, item, amount, and short expiry window.
+
+Only then can Yukti create a scoped Prava sandbox checkout. The credential stays in the server-side transaction path, and Yukti records pending, completed, declined, provider-error, and revoked states without silently retrying an uncertain purchase.
+
+The result is not a chatbot that asks the user to repeat everything. It is a small operating surface for the whole decision: what matters today, what Yukti remembers about each person, the product evidence it found, the permission the user granted, and the transaction consequence.
+
+## How it works
+
+1. A signed Linq webhook receives a relationship, preference, budget, location, or cadence message.
+2. Yukti saves the facts to the user's D1-backed memory record and keeps each fact correctable or deletable.
+3. Senso retrieves the relevant context for the due gift.
+4. Gemini 3.6 Flash checks the exact live merchant page and returns structured product evidence with a citation.
+5. The user approves the merchant, item, amount, and 15-minute window.
+6. Yukti creates a scoped Prava sandbox session and opens Prava's hosted checkout.
+7. Yukti polls and reconciles the owned session, keeps credentials server-side, and can revoke an open checkout.
+
+## Technologies used
+
+Prava, Linq, Senso, Gemini 3.6 Flash, Composio, Codex, Next.js, TypeScript, Cloudflare Workers, D1, GitHub OAuth with PKCE, Vitest, Playwright, and HyperFrames.
+
+## Track choices
+
+Choose only tracks exposed by the Devfolio form. The strongest evidence is:
+
+1. **Prava overall / Visa:** central approval-to-scoped-checkout flow, transaction lifecycle, and an attended Visa verification handoff.
+2. **Linq:** iMessage is a core input and proactive output surface, with a signed webhook and a verified owner flow.
+3. **Senso Discovery and Trust:** retrieved memory materially changes the product choice and is shown with attributable context.
+4. **Localhost Most Startup-Ready Product:** a public, continuing-use product with clear control, privacy, and failure boundaries.
+5. **OpenAI / Codex:** substantive engineering and release work completed with Codex during the build window, if that track is present.
+
+Do not choose a Composio track unless the form allows readiness-only evidence. The calendar connection is real, but Yukti does not claim a completed user-scoped calendar workflow on the public judge account.
+
+## What worked
+
+The public app, GitHub session boundary, Linq memory flow, editable People records, Senso retrieval, Gemini live-page inspection, cited product option, D1 approval, Prava session creation, checkout handoff, polling, revocation, and provider readiness checks work in production. The private owner flow also sent a proactive FTD suggestion through Linq and recorded a single-use USD 45 approval without starting a charge.
+
+## What did not fully work
+
+Prava accepted the corrected sandbox card and reached Visa verification, but its SMS and email OTP did not arrive. The newest CAD 42 sandbox order remains `Pending`; no scoped credentials were issued and no completed payment is claimed. During live product research, Google Search grounding returned provider-side automated-query protection, so Yukti used Gemini URL Context against the exact merchant page and stored that citation.
+
+## What we learned
+
+Agentic commerce becomes useful when the authority is as clear as the recommendation. The product has to show which memory informed the choice, which product is current, exactly what the user approved, when that permission expires, and how an uncertain provider state is handled.
+
+## Pre-existing work disclosure
+
+The Yukti application, UX, integrations, tests, deployment, and submission materials were built during the official hackathon window. Before the event, the workspace contained planning context and local sponsor credentials, but no Yukti application.
+
+## Screenshot order
+
+The first image becomes the Devfolio cover.
+
+Use the numbered files in the local `devfolio-assets` folder:
+
+1. `01-yukti-cover.png` for the cover and core product idea.
+2. `02-yukti-imessage.png` for the message-native entry point.
+3. `03-yukti-memory-and-live-product.png` for editable memory and cited product research.
+4. `04-yukti-exact-approval.jpg` for the merchant, item, amount, and expiry boundary.
+5. `05-prava-visa-verification-redacted.png` as evidence only, never as a successful-payment claim.
+6. `06-yukti-activity.png` for the integration and transaction trail.
+
+## Final publishing checklist
+
+- Upload the silent 2:06 MP4 to YouTube as **Unlisted** and paste the link.
+- Upload screenshots in the order above and check that the first image crops well as the cover.
+- Paste the project name, tagline, problem, description, technologies, links, and track evidence.
+- Add every team member and confirm each required RSVP or check-in is complete.
+- Review the entry for exposed keys, payment credentials, private calendar contents, phone numbers, or personal messages.
+- Select **Publish Project**.
+- Confirm the dashboard status reads **Submitted**.
+- Take a timestamped screenshot of the submitted status for your records.
+
+The live Devfolio schedule currently shows the event ending August 2, 2026 at 7:00 PM PT. The handbook also contains a separate 3:00 PM PT hard-deadline paragraph. Treat 3:00 PM PT as the safe cutoff unless the organizers resolve that conflict in writing.

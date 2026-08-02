@@ -1,44 +1,58 @@
 # Yukti submission copy
 
+## Project name
+
+Yukti
+
 ## Tagline
 
 The gifting concierge that remembers the person and asks before it buys.
 
 ## Problem
 
-Important personal tasks arrive as calendar events, half-remembered preferences, and deadlines. Existing assistants can remind you, but they rarely assemble the context, narrow the choices, obtain precise consent, and carry the task into a safe transaction.
+Buying a thoughtful gift is rarely one task. You have to remember the date, recall what the person likes, set a sensible budget, find something current, check whether it can arrive, and then make the purchase. Calendar reminders preserve the deadline but leave the rest of that work to you.
 
-## What Yukti does
+## Product
 
-Yukti learns who someone is to you, their preferences, budget, location, and a gifting cadence through Linq. When a gift is due, it retrieves relevant memory through Senso, uses Gemini 3.6 Flash to inspect a current merchant page, and asks the user to approve one exact merchant, item, amount, and expiry window. Only then can it create a Prava sandbox checkout. The payment credential stays inside the server-side transaction path, and Yukti records whether Prava is pending, completed, or received a known sandbox merchant decline.
+Yukti turns that scattered process into one controlled flow. A user can text Yukti through Linq with facts such as who Sarah is, what she likes, the budget they prefer, and where the gift needs to go. Yukti keeps those memories visible and editable, retrieves the relevant context through Senso, and uses Gemini 3.6 Flash to inspect a current merchant page. It then presents one concrete option with its source and asks for exact approval of the merchant, item, amount, and expiry window.
 
-The interaction is intentionally not a chatbot. It is a quiet workspace for reviewing evidence, making one decision, and seeing the consequence.
+Only that approval can open a Prava sandbox checkout. A reminder can prepare a purchase, but it cannot silently become a charge.
 
-## Prava implementation
+The product is a quiet workspace rather than another open-ended chat window. Today shows what needs attention, People shows what Yukti remembers, Wallet holds approvals and checkout state, and Activity makes the integration and transaction trail legible.
 
-Prava is the transaction boundary, not a decorative payment button. Yukti creates a single-use server approval, validates ownership and expiry, creates a merchant- and amount-scoped Prava sandbox session, opens Prava's secure collection flow, checks the payment result, and reports a known merchant outcome back to Prava. Scoped credentials are handled only inside the server callback and are neither persisted nor returned to the browser.
+## How Prava is used
+
+Prava is Yukti's transaction boundary, not a decorative payment button. Yukti creates a single-use approval, validates its owner and expiry, and creates a merchant- and amount-scoped Prava sandbox session. Payment credentials remain inside the server-side callback path and are never persisted or returned to the browser. Yukti can poll the owned session, reconcile the checkout return, record a known merchant result, and revoke an open session. It never retries an uncertain purchase.
+
+The attended sandbox run accepted the corrected Prava test card and reached Visa verification. The OTP was not delivered, so the newest CAD 42 order remains `Pending` and no scoped credentials were issued. The demo states that boundary plainly and does not claim a completed transaction.
 
 ## Sponsor technology
 
-- **Prava:** secure sandbox payment session and result lifecycle
-- **Senso:** attributable retrieval of the seeded preference context
-- **Gemini 3.6 Flash:** constrained product research with URL citations, structured output, and bounded usage
-- **Codex:** substantive product engineering, security review, tests, deployment, and release verification during the hackathon
-- **Composio:** active Google Calendar connection and readiness verification; real calendar contents are not exposed through the shared public judge account
-- **Linq:** signed iMessage webhook, relationship-memory capture, automated reply, and idempotent proactive suggestion delivery to the configured owner
+- **Prava:** scoped sandbox checkout sessions, owned-session polling, revocation, reconciliation, and result reporting
+- **Linq:** signed inbound iMessage webhook, relationship-memory capture, automated replies, and idempotent proactive gift suggestions
+- **Senso:** attributable retrieval of person and preference context that materially influences the recommendation
+- **Gemini 3.6 Flash:** constrained live-page product research with stored citations and bounded usage
+- **Composio:** verified Google Calendar connection for the private owner account; the public judge account does not receive access to the shared calendar
+- **Codex:** product engineering, security review, testing, deployment, copy audit, and release verification during the build window
 
 ## What worked
 
-The public app, GitHub identity boundary, Linq-to-memory flow, Senso retrieval, Gemini live-page research, cited product card, D1 approval, Prava session creation, provider readiness checks, and cancellation path work end to end. Composio is connected to Google Calendar under the intended Yukti owner identity. The production demo recorded a 15-minute approval for FTD's Sweet & Pretty Bouquet at USD 45 for Sarah in Vancouver without starting a charge.
+The public product, GitHub identity boundary, Linq-to-memory flow, editable People records, Senso retrieval, Gemini live-page research, cited product card, D1-backed approval, Prava sandbox session creation, checkout handoff, result polling, revocation, and provider readiness checks work in production. The connected owner flow also sent an attended proactive FTD suggestion through Linq and recorded a 15-minute, single-use USD 45 approval for Sarah without starting a charge.
 
-## What did not fully work yet
+## What did not fully work
 
-In the recorded July 31 sandbox run, Prava accepted the hosted test-card form but remained on its provider-owned `Securing your card details...` state. Its dashboard still shows the matching CAD 42 order as `Pending`, with seven orders but zero transactions, and the API has not issued scoped credentials. Yukti exposes that state honestly and can finalize and report the deterministic merchant-test decline as soon as Prava returns `awaiting_result`.
+Prava's hosted checkout reached Visa verification, but neither its SMS nor email OTP arrived. The corresponding sandbox order is still `Pending`, so Yukti has not received scoped credentials and does not claim a successful payment. Google Search grounding also returned provider-side automated-query protection during the live product run; Yukti used Gemini URL Context against the exact FTD page and retained that citation instead.
 
 ## What we learned
 
-The difficult part of agentic commerce is not generating another recommendation. It is making authority legible: whose context was used, what exact purchase was approved, how long that authority lasts, where credentials can exist, and what happens when a provider result is uncertain.
+The hard part of agentic commerce is not producing another recommendation. It is making authority legible: whose context was used, what exact purchase was approved, how long that permission lasts, where payment credentials can exist, and what the product does when a provider result is uncertain.
 
 ## Built during the hackathon
 
-The application code, product design, provider adapters, security controls, tests, deployment, and submission materials were created during the hackathon build window. The starting workspace contained planning context and local sponsor credentials, but no Yukti application.
+The Yukti application, product design, provider adapters, relationship-memory flow, approval model, security controls, tests, deployment, and submission materials were created during the official build window. The starting workspace contained planning context and local sponsor credentials, but no Yukti application.
+
+## Links
+
+- Product: <https://yukti.yashns.chatgpt.site>
+- Repository: <https://github.com/YashSerai/yukti>
+- Demo video: upload the local final MP4 and paste its public or unlisted URL here
