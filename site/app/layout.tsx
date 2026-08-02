@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./product-responsive.css";
 
@@ -14,6 +14,11 @@ export const metadata: Metadata = {
     images: [{ url: "/og.png", width: 1732, height: 908, alt: "Yukti gift box and the words Thoughtful gifts, without starting from scratch." }],
   },
   twitter: { card: "summary_large_image", images: ["/og.png"] },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

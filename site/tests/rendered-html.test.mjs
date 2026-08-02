@@ -16,6 +16,7 @@ test("server-renders the signed-out Yukti product landing page", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
   assert.match(html, /<title>Yukti \| Thoughtful gifts, prepared<\/title>/i);
+  assert.match(html, /<meta[^>]+name="viewport"[^>]+width=device-width[^>]+initial-scale=1/i);
   assert.match(html, /Thoughtful gifts, without starting from scratch/);
   assert.match(html, /Get started with GitHub/);
   assert.match(html, /Remember the person/);
