@@ -46,6 +46,8 @@ Release gate after the local implementation and provider-integration slices.
 - An hourly GitHub Actions worker checks due flower rules with quiet hours and idempotency; production dry-run `30742489798` passed
 - Purchases replaces the old Wallet label and provides a durable approval and transaction ledger
 - Gmail was deliberately removed from the product, provider setup, and deployment configuration; Calendar is the only background source
+- Sites version 28 is live from commit `15c600c`; final desktop and 390 px production QA covered signed-out, Today, task, People, Purchases, Activity, and Calendar surfaces with no browser errors
+- The owner demo ledger is clean, generated reminder shells are removed, and Sarah's active flower rule next scans on August 28
 - README, submission copy, demo script, eligibility checklist, and real-versus-simulated disclosure are current
 
 ## Evidence refs
