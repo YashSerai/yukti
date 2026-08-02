@@ -19,6 +19,6 @@ test("server-renders the Yukti judge experience", async () => {
   assert.match(html, /Sarah(?:’|&#x27;|')s birthday/);
   assert.match(html, /Purchase approval/);
   assert.match(html, /Upcoming/);
-  assert.match(html, /Sign in to use personal memory/);
-  assert.doesNotMatch(html, /Your site is taking shape|react-loading-skeleton/);
+  assert.match(html, /Sign in to approve/);
+  assert.doesNotMatch(html, /Your site is taking shape|react-loading-skeleton|Private by design|Memory connected|seeded|fixture|sponsor integration/i);
 });
