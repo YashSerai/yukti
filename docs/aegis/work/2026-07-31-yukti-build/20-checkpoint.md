@@ -51,11 +51,11 @@ Release gate after the local implementation and provider-integration slices.
 
 ## Blockers
 
-Prava's hosted sandbox is still provider-pending after the submitted test card. The matching dashboard order remains `Pending`, while the account shows zero transactions, so scoped credential issuance and final status reporting do not yet have attended production evidence. Unattended cadence execution is also not claimed because ChatGPT Sites has no documented scheduler contract. Final screenshots, the short demo video, the first GitHub push, and Devfolio publication remain open.
+Prava's hosted sandbox is still provider-pending after the submitted test card. The matching dashboard order remains `Pending`, while the account shows zero transactions, so scoped credential issuance and final status reporting do not yet have attended production evidence. Unattended cadence execution is also not claimed because ChatGPT Sites has no documented scheduler contract. Devfolio video upload and final submission remain open.
 
 ## Next step
 
-Capture the proven Linq-to-memory, cited live-product, and exact-approval path; keep the Prava pending state explicit; then finish the video, first GitHub push, and Devfolio submission.
+Upload the verified local demo video, keep the Prava pending state explicit, and complete the Devfolio submission before the stricter handbook deadline.
 
 ## Resume state
 

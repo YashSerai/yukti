@@ -1,54 +1,53 @@
 # Yukti judge demo
 
-Target length: 2 minutes.
+Target length: 90 seconds.
 
 ## Before recording
 
-- Open <https://yukti.yashns.chatgpt.site> in a clean window.
-- Confirm GitHub returns `@YashSerai`.
-- Run **Audit → Check connections** once.
-- Keep the Prava sandbox test card ready. Do not show any API key, browser credential, or private calendar content.
+- Open <https://yukti.yashns.chatgpt.site> in the signed-in owner session.
+- Open **Activity**, run **Check connections**, then return to **Today**.
+- Keep the redacted Prava sandbox screen ready. Never show an API key, payment credential, private calendar event, or unredacted order identifier.
+- Put the real-versus-simulated disclosure in the submission description rather than adding implementation labels to the product UI.
 
 ## Script
 
-**0:00 — The problem**
+**0:00 | Start with the person**
 
-“A calendar reminder tells me Sarah's birthday is coming up, but the real task is everything after the reminder. Yukti prepares that work and stops before it spends.”
+“Buying a thoughtful gift should not start with another search. It should start with who the person is.”
 
-Show the birthday event, the known-context line, and the two seeded candidates. Point out that fixture evidence is labelled.
+Show Sarah's birthday on **Today**, the details Yukti used, the two options, and the exact purchase approval.
 
-**0:20 — Retrieval and reasoning**
+**0:12 | One message becomes memory**
 
-Select **Prepare with Gemini 3.6 Flash**.
+“I text Yukti once: Sarah is my girlfriend, she loves tulips, keep gifts under seventy-five dollars, and remind me about flowers every four weeks.”
 
-“Senso retrieves the relevant memory excerpt. Gemini explains why each bounded candidate fits, and it must preserve the warning that availability and delivery are still fixture data.”
+Show the Google Messages thread, then open **People**. Point out the editable relationship, preference, budget, location, and flower reminder without discussing internal storage or test data.
 
-**0:40 — Exact authority**
+**0:32 | Find a current option**
 
-Choose the tea set, select **Review and approve**, and read the merchant, amount, and 15-minute expiry.
+“When the reminder is due, Yukti checks a current merchant page for Sarah's location. It keeps the source beside the option, and the merchant still confirms the exact address and delivery date.”
 
-“This approval is server-owned, single-use, and tied to one candidate, merchant, currency, and amount. Changing any of those fields invalidates it.”
+Show the FTD product card and its merchant link. Do not claim guaranteed inventory or delivery.
 
-Approve, then create the Prava sandbox session.
+**0:50 | Approve one purchase**
 
-**1:05 — Transaction**
+“Yukti can prepare the purchase, but it cannot spend freely. I approve one merchant, one item, one amount, and a fifteen-minute window.”
 
-Open the secure Prava checkout and use only the sandbox test card.
+Open **Review and approve** and show the amount, expiry, single-use boundary, and checkout handoff.
 
-“Yukti never sees or stores the card entry. Prava securely collects it and issues scoped credentials only after this approved session.”
+**1:05 | Prava transaction boundary**
 
-Return to Yukti and select **Verify sandbox result**.
+“Only that approval can open the Prava sandbox checkout. Card entry stays with Prava, and Yukti never returns payment credentials to the browser.”
 
-- If Prava returns `awaiting_result`: show Yukti's scoped-credential receipt and the reported sandbox merchant decline.
-- If Prava still returns `pending`: say, “Prava still reports this provider-owned session as pending, so Yukti does not claim a completed transaction or retry the purchase.” Do not substitute a mocked success.
+Show the redacted Prava test-card screen. If the session is still pending, say so directly. Do not retry it or imply a completed transaction.
 
-**1:35 — Trust and evidence**
+**1:18 | The full system**
 
-Open **Audit**.
+Open **Activity** and run **Check connections**.
 
-“The shared keys stay server-side. GitHub protects sponsor actions without repository or email access. Provider checks are rate-limited, and Composio calendar data and Linq messaging are not exposed through this public multi-user demo.”
+“Linq carries the conversation, Senso and Gemini help turn memory into a current option, Composio connects the calendar, and Prava controls the transaction. Yukti keeps the final decision with the user.”
 
-**1:55 — Close**
+**1:28 | Close**
 
-“Yukti's product insight is simple: an agent can do the preparation, but money needs a small, visible envelope of authority.”
+“Buying made personal. Spending kept explicit.”
 

@@ -11,8 +11,8 @@ Calendar assistants usually remind people that something matters, then leave the
 ## Judge path
 
 1. Sign in with GitHub. Yukti requests public profile access only.
-2. Open **Audit** and run **Check connections**.
-3. Return to **Today** and prepare the birthday decision brief with Senso and Gemini 3.6 Flash.
+2. Open **Activity** and run **Check connections**.
+3. Return to **Today** and select **Check current options**.
 4. Review one candidate and approve the exact merchant, item, amount, and 15-minute window.
 5. Create the Prava sandbox session and open its secure checkout.
 6. Complete the hosted test-card flow, then use **Verify sandbox result** in Yukti. Scoped payment credentials remain server-side and are never returned to the browser or stored.
@@ -20,12 +20,12 @@ Calendar assistants usually remind people that something matters, then leave the
 ## Connected owner path
 
 1. Text the Yukti Linq number with an explicit relationship fact, preference, budget, delivery location, or flower cadence.
-2. Open **People** to inspect, correct, or delete what Yukti learned and see its Linq provenance.
-3. Save a flower reminder and run **Find a live flower option**. Yukti requires a user-supplied destination, retrieves current products from FTD's public catalog, and asks Gemini 3.6 Flash to check the exact option. It attempts Google Search grounding and falls back on a search-quota response to URL Context for the exact merchant page. Citations are stored with the snapshot; the merchant still confirms the address and delivery date.
-4. Use **Prepare and text me** for the proactive iMessage prompt, or approve the exact live product from the console.
+2. Open **People** to inspect, correct, or delete what Yukti learned and see which details came from your messages.
+3. Save a flower reminder and select **Find a flower option**. Yukti requires a user-supplied destination, retrieves current products from FTD's public catalog, and uses Gemini 3.6 Flash to check the exact merchant page. Citations are stored with the snapshot; the merchant still confirms the address and delivery date.
+4. Use **Find and text me** for the proactive iMessage prompt, or approve the exact live product from Yukti.
 5. Continue through the same short-lived Prava sandbox boundary. A recurring reminder never becomes an automatic recurring charge.
 
-The public experience is deliberately seeded. Product recommendations, delivery claims, and personal facts are fixtures unless the interface explicitly labels a connected source.
+The anonymous and non-owner judge path uses deterministic demo data. The signed-in owner path uses the verified Linq, Senso, Gemini, Composio, and Prava integrations. [Real and simulated boundaries](docs/real-versus-simulated.md) are documented separately so the product interface can stay focused on the task.
 
 ## Architecture and controls
 

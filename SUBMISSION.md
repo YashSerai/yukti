@@ -2,7 +2,7 @@
 
 ## Tagline
 
-The life-admin agent that prepares decisions and stops at the spend boundary.
+The gifting concierge that remembers the person and asks before it buys.
 
 ## Problem
 

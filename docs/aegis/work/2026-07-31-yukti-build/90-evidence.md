@@ -91,3 +91,10 @@ Additional evidence is appended by bounded task slice, never as raw secrets or p
 - The Prava dashboard was rechecked after the hosted test-card attempt. It shows the matching `ord_01KYXJJRRGBQFD0A...` CAD 42 order as `Pending`, seven total orders, zero total transactions, zero volume, and no success rate. This corroborates the earlier payment-result response: Prava has not issued scoped credentials or advanced to a transaction.
 - ChatGPT Sites has no documented scheduled-event contract. Yukti's due-rule scan and attended `Prepare and text me` path are production-proven, but unattended cadence execution is not claimed without a signed external scheduler.
 - Final gate: typecheck, lint with one external-image advisory and zero errors, 12 test files with 40 passing tests, rendered HTML test, production build, and zero exact secret-value hits.
+
+## Copy audit and launch video
+
+- Production version 19 is deployed at `https://yukti.yashns.chatgpt.site` from commit `1c390270b28315dbdd10bda653ab34617a612ac8`.
+- Today, People, Wallet, Activity, both secondary event states, the purchase dialog, and 390 px phone layouts were inspected in the rendered production app. The internal-copy regression scan returned no matches, and the browser console returned no warnings or errors.
+- Technical provenance IDs and the accidental `For the demo` message prefix were removed from presentation without changing the underlying memory or message records.
+- The 73.37-second 1920x1080 H.264/AAC launch video was rebuilt from the verified production captures. Its source and MP4 live only under the locally excluded `local-video/` directory and are absent from Git history.

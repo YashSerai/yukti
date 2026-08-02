@@ -23,7 +23,7 @@ Checked against the published Agentic Commerce Hackathon Builder Handbook on Jul
 - [x] Sandbox transaction is not presented as a live purchase
 - [x] User can see pending, completed, declined, and provider-error states
 - [x] Secrets and payment credentials are excluded from the browser, repository, and submission copy
-- [x] The app labels fixtures and does not invent merchant availability or delivery guarantees
+- [x] Submission materials disclose the demo data, and the product does not invent merchant availability or delivery guarantees
 - [ ] Prava hosted checkout advances from `pending` to scoped credential issuance in an attended run
 
 ## Tracks we can defend
@@ -31,7 +31,7 @@ Checked against the published Agentic Commerce Hackathon Builder Handbook on Jul
 - [x] Prava overall and Visa consideration: approval controls and Prava sandbox transaction path are central
 - [x] Senso Discovery and Trust: retrieved memory is attributable and visibly separated from fixture commerce claims
 - [x] OpenAI: substantive Codex use during implementation, QA, and release
-- [ ] Linq: do not enter until messaging is a real core interface and an attended message flow is proven
+- [x] Linq: signed messaging is a core interface, and the attended memory and proactive-message flow is proven
 - [ ] Composio: do not claim a completed calendar workflow; only connection readiness is currently proven
 
 ## Submission timing
