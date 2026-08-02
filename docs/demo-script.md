@@ -1,53 +1,59 @@
-# Yukti judge demo
+# Yukti demo script
 
-Target length: 90 seconds.
+Target: 82 seconds at a calm, conversational pace.
 
-## Before recording
+The quoted paragraphs are the words to read. The visual directions are not part of the narration.
 
-- Open <https://yukti.yashns.chatgpt.site> in the signed-in owner session.
-- Open **Activity**, run **Check connections**, then return to **Today**.
-- Keep the redacted Prava sandbox screen ready. Never show an API key, payment credential, private calendar event, or unredacted order identifier.
-- Put the real-versus-simulated disclosure in the submission description rather than adding implementation labels to the product UI.
+## 0:00 to 0:10 | Start with Yukti
 
-## Script
+> Most gift shopping starts with a blank search box. Yukti starts with the person. Sign in, connect messages, and it builds around your own relationships.
 
-**0:00 | Start with the person**
+Open on the public Yukti landing page and hold the real page long enough to read the headline and sign-in action. Do not add labels or pointers.
 
-“Buying a thoughtful gift should not start with another search. It should start with who the person is.”
+## 0:10 to 0:24 | One message becomes memory
 
-Show Sarah's birthday on **Today**, the details Yukti used, the two options, and the exact purchase approval.
+> In my account, one message tells Yukti that Sarah is my girlfriend, she loves tulips, I usually spend up to seventy-five dollars, and I want a flower reminder every four weeks.
 
-**0:12 | One message becomes memory**
+Show only the privacy-cropped Yukti conversation. Keep the message and reply readable. Do not show the Google Messages sidebar, phone number, or the later location message that contains demo wording.
 
-“I text Yukti once: Sarah is my girlfriend, she loves tulips, keep gifts under seventy-five dollars, and remind me about flowers every four weeks.”
+## 0:24 to 0:36 | Memory stays under your control
 
-Show the Google Messages thread, then open **People**. Point out the editable relationship, preference, budget, location, and flower reminder without discussing internal storage or test data.
+> That conversation becomes memory I can inspect, correct, or delete. Yukti knows who Sarah is, what she likes, the budget, her location, and the reminder I asked for.
 
-**0:32 | Find a current option**
+Cut to People, then cut to the saved reminder. Do not place the chat and People screens beside each other.
 
-“When the reminder is due, Yukti checks a current merchant page for Sarah's location. It keeps the source beside the option, and the merchant still confirms the exact address and delivery date.”
+## 0:36 to 0:48 | Check a current option
 
-Show the FTD product card and its merchant link. Do not claim guaranteed inventory or delivery.
+> When the reminder is due, Yukti checks a current merchant page against Sarah's location and budget. Here it found an FTD bouquet, kept the source beside the recommendation, and left delivery confirmation to the merchant.
 
-**0:50 | Approve one purchase**
+Settle on the real FTD product card. Keep the price, source link, location caveat, and merchant-confirmation language readable. Do not claim guaranteed stock, price, or delivery.
 
-“Yukti can prepare the purchase, but it cannot spend freely. I approve one merchant, one item, one amount, and a fifteen-minute window.”
+## 0:48 to 1:00 | Approve one purchase
 
-Open **Review and approve** and show the amount, expiry, single-use boundary, and checkout handoff.
+> For Sarah's birthday, Yukti applies the same boundary to a jasmine tea set: one item, merchant, amount, and fifteen-minute window. The approval is single-use, so a reminder can never become a recurring charge.
 
-**1:05 | Prava transaction boundary**
+Show the real purchase approval area at full frame so the exact fields remain visible. No animated rectangles, pointer lines, or decorative highlights.
 
-“Only that approval can open the Prava sandbox checkout. Card entry stays with Prava, and Yukti never returns payment credentials to the browser.”
+## 1:00 to 1:10 | Prava owns the payment boundary
 
-Show the redacted Prava test-card screen. If the session is still pending, say so directly. Do not retry it or imply a completed transaction.
+> Prava turns that permission into a scoped sandbox checkout. Card entry and Visa verification stay with Prava, while Yukti keeps payment credentials out of the browser.
 
-**1:18 | The full system**
+Move from Yukti's approved transaction to the redacted Prava verification screen. Show it briefly as checkout evidence, then leave it. Do not show an order identifier, credential, completion claim, or missing-OTP message.
 
-Open **Activity** and run **Check connections**.
+## 1:10 to 1:18 | One observable system
 
-“Linq carries the conversation, Senso and Gemini help turn memory into a current option, Composio connects the calendar, and Prava controls the transaction. Yukti keeps the final decision with the user.”
+> Linq carries the conversation. Senso retrieves memory. Gemini checks current product evidence. Composio connects the calendar. Every approval stays visible in Activity.
 
-**1:28 | Close**
+Show the real Activity page with the five customer-facing connection roles marked available and the approval history beneath it. Provider names belong in the narration, not as a decorative logo wall.
 
-“Buying made personal. Spending kept explicit.”
+## 1:18 to 1:22 | Close on control
 
+> Yukti prepares the decision. You stay in control.
+
+Return to the real Today surface and hold the exact purchase boundary through the final word.
+
+## Recording notes
+
+- Read conversationally. Pause briefly after “current merchant page,” “single-use,” and “Visa verification.”
+- This picture master is silent. Record voice separately only if the submission format later calls for it.
+- The submission description, not the product UI, should identify the owner walkthrough as preloaded.
