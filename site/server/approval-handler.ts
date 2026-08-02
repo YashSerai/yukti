@@ -131,7 +131,7 @@ async function providerStatus(env: RuntimeEnv) {
       senso: { state: env.SENSO_API_KEY ? "configured" : "not_configured" },
       gemini: { state: env.GEMINI_API_KEY && /gemini-[\w.-]*flash[\w.-]*$/i.test(env.GEMINI_MODEL ?? "gemini-3.6-flash") ? "flash_ready" : "not_configured", model: env.GEMINI_MODEL ?? "gemini-3.6-flash" },
       linq: linq.ok ? { state: linq.value.configured ? "healthy" : "not_configured", detail: linq.value.status } : { state: "unavailable" },
-      composio: composio.ok && composio.value.connected ? { state: "connected" } : { state: "disconnected", detail: "Calendar consent not granted" },
+      composio: composio.ok && composio.value.connected ? { state: "connected" } : { state: "disconnected", detail: "Calendar permission needed" },
     },
   }, 200);
 }

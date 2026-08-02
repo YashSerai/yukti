@@ -8,7 +8,7 @@ export const seedCandidates = [
   { id: "cand-book", merchant: "Paper Hound", title: "The Art of Still Life", price: 3800, currency: "CAD", arrival: "Pickup today", reason: "Fits her ceramics class and avoids guessing a clothing size.", evidence: "Memory note · Jun 02" },
 ] as const;
 export const seedAudit = [
-  { time: "10:14", title: "Prepared two gift options", detail: "No live purchase attempted" },
-  { time: "10:13", title: "Checked event deadline", detail: "Dinner is nine days away" },
-  { time: "10:12", title: "Matched three memory facts", detail: "Relationship context" },
+  { time: "10:14", title: "Prepared two gift options", detail: "Sarah’s birthday" },
+  { time: "10:13", title: "Checked event timing", detail: "Dinner is nine days away" },
+  { time: "10:12", title: "Matched three details about Sarah", detail: "Tea, ceramics, useful gifts" },
 ] as const;

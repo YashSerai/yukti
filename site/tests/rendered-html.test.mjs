@@ -17,8 +17,8 @@ test("server-renders the Yukti judge experience", async () => {
   const html = await response.text();
   assert.match(html, /<title>Yukti \| Thoughtful gifts, prepared<\/title>/i);
   assert.match(html, /Sarah(?:’|&#x27;|')s birthday/);
-  assert.match(html, /Transaction envelope/);
-  assert.match(html, /Private by design/);
+  assert.match(html, /Purchase approval/);
+  assert.match(html, /Upcoming/);
   assert.match(html, /Sign in to use personal memory/);
   assert.doesNotMatch(html, /Your site is taking shape|react-loading-skeleton/);
 });
