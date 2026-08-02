@@ -14,11 +14,11 @@ Buying a thoughtful gift is rarely one task. You have to remember the date, reca
 
 ## Product
 
-Yukti turns that scattered process into one controlled flow. A user can text Yukti through Linq with facts such as who Sarah is, what she likes, the budget they prefer, and where the gift needs to go. Yukti keeps those memories visible and editable, retrieves the relevant context through Senso, and uses Gemini 3.6 Flash to inspect a current merchant page. It then presents one concrete option with its source and asks for exact approval of the merchant, item, amount, and expiry window.
+Yukti turns that scattered process into one controlled flow. A user can text Yukti through Linq with facts such as who someone is, what they like, the budget they prefer, and where the gift needs to go. Yukti keeps those memories visible and editable, imports upcoming dates from Google Calendar, and supports account-owned jobs such as passport renewal and appointment follow-up. Senso retrieves the relevant context, while Gemini 3.6 Flash interprets messages and inspects a current merchant page. Yukti then presents one concrete option with its source and asks for exact approval of the merchant, item, amount, and expiry window.
 
 Only that approval can open a Prava sandbox checkout. A reminder can prepare a purchase, but it cannot silently become a charge.
 
-The product is a quiet workspace rather than another open-ended chat window. Today shows what needs attention, People shows what Yukti remembers, Wallet holds approvals and checkout state, and Activity makes the integration and transaction trail legible.
+The product is a quiet workspace rather than another open-ended chat window. Today shows what needs attention, People shows what Yukti remembers, Purchases holds approvals and checkout state, Activity records meaningful changes, and Calendar imports upcoming dates on demand. A deployed hourly worker checks due flower rules and sends at most one idempotent suggestion for each due cycle. Purchases still require attended approval.
 
 ## How Prava is used
 
@@ -32,12 +32,12 @@ The attended sandbox run accepted the corrected Prava test card and reached Visa
 - **Linq:** signed inbound iMessage webhook, relationship-memory capture, automated replies, and idempotent proactive gift suggestions
 - **Senso:** attributable retrieval of person and preference context that materially influences the recommendation
 - **Gemini 3.6 Flash:** constrained live-page product research with stored citations and bounded usage
-- **Composio:** verified Google Calendar connection for the private owner account; the public judge account does not receive access to the shared calendar
+- **Composio:** user-authorized Google Calendar connection and event import into each account's Today view
 - **Codex:** product engineering, security review, testing, deployment, copy audit, and release verification during the build window
 
 ## What worked
 
-The public product, GitHub identity boundary, Linq-to-memory flow, editable People records, Senso retrieval, Gemini live-page research, cited product card, D1-backed approval, Prava sandbox session creation, checkout handoff, result polling, revocation, and provider readiness checks work in production. The connected owner flow also sent an attended proactive FTD suggestion through Linq and recorded a 15-minute, single-use USD 45 approval for Sarah without starting a charge.
+The public product, GitHub identity boundary, guided onboarding, account-owned People and tasks, Calendar import, Linq-to-memory flow, contextual clarification, editable memory, Senso retrieval, Gemini live-page research, cited product card, scheduled due-rule checks, D1-backed approval, Purchases ledger, Prava sandbox session creation, checkout handoff, result polling, revocation, and provider readiness checks work in production. The owner account also sent an attended proactive FTD suggestion through Linq without starting a charge.
 
 ## What did not fully work
 

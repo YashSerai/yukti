@@ -8,16 +8,16 @@ Live demo: <https://yukti.yashns.chatgpt.site>
 
 Calendar assistants usually remind people that something matters, then leave the work untouched. Yukti brings the useful context, deadline, options, approval boundary, and transaction evidence into one flow. It is designed for consequential tasks where the user should not have to start from scratch, but the agent should not be allowed to spend freely.
 
-## Judge path
+## Product path
 
 1. Sign in with GitHub. Yukti requests public profile access only.
-2. Open **Activity** and run **Check connections**.
-3. Return to **Today** and select **Check current options**.
-4. Review one candidate and approve the exact merchant, item, amount, and 15-minute window.
-5. Create the Prava sandbox session and open its secure checkout.
-6. Complete the hosted test-card flow, then use **Verify sandbox result** in Yukti. Scoped payment credentials remain server-side and are never returned to the browser or stored.
+2. Pair a messaging number and add the first person Yukti should remember.
+3. Connect Google Calendar if you want upcoming events imported into **Today**.
+4. Add or answer a personal task, or save a relationship preference and flower cadence through messaging.
+5. Review a current product with its source, then approve the exact merchant, item, amount, and 15-minute window.
+6. Create the Prava sandbox session and open its secure checkout. Scoped payment credentials remain server-side and are never returned to the browser or stored.
 
-## Connected owner path
+## Connected messaging path
 
 1. Text the Yukti Linq number with an explicit relationship fact, preference, budget, delivery location, or flower cadence.
 2. Open **People** to inspect, correct, or delete what Yukti learned and see which details came from your messages.
@@ -25,7 +25,7 @@ Calendar assistants usually remind people that something matters, then leave the
 4. Use **Find and text me** for the proactive iMessage prompt, or approve the exact live product from Yukti.
 5. Continue through the same short-lived Prava sandbox boundary. A recurring reminder never becomes an automatic recurring charge.
 
-The anonymous and non-owner judge path uses deterministic demo data. The signed-in owner path uses the verified Linq, Senso, Gemini, Composio, and Prava integrations. [Real and simulated boundaries](docs/real-versus-simulated.md) are documented separately so the product interface can stay focused on the task.
+Every signed-in user receives the same account-owned Today, People, Purchases, Activity, and Calendar product. The owner account is preloaded for the recorded walkthrough, but that data is never shown on the public landing page or in another user's account. [Real and simulated boundaries](docs/real-versus-simulated.md) are documented separately so the product interface can stay focused on the task.
 
 ## Architecture and controls
 
@@ -36,7 +36,7 @@ The anonymous and non-owner judge path uses deterministic demo data. The signed-
 - GitHub OAuth with PKCE, single-use state, hashed server sessions, and no repository or email scope
 - Same-origin mutation checks, per-user and global provider quotas, provider timeouts, one bounded 502/503/504 retry, redacted errors, and secret-only runtime configuration
 
-The connected Linq and relationship-memory workflow is available only to the mapped owner identity. Public judges receive the seeded view and cannot access the owner's phone, messages, memory, reminders, or shared Composio Calendar connection.
+Linq pairings, relationship memory, tasks, Calendar connections, approvals, and transactions are all scoped to the authenticated user. The shared provider keys remain server-side and do not grant one user access to another user's data.
 
 ## Local verification
 

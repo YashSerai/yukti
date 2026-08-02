@@ -20,23 +20,24 @@ Buying a thoughtful gift means remembering the person, the occasion, their prefe
 
 ## Project description
 
-Yukti is a relationship-aware gifting concierge that begins in iMessage and stops at an explicit spend boundary.
+Yukti is a relationship-aware personal concierge that begins in iMessage and stops at an explicit spend boundary.
 
-A user can text Yukti through Linq with facts such as who Sarah is, what she likes, their preferred budget, location, and gifting cadence. Yukti turns those messages into editable person memory, retrieves the relevant context through Senso, and uses Gemini 3.6 Flash to inspect a current merchant page. The user sees the source beside the option and approves one exact merchant, item, amount, and short expiry window.
+A user can text Yukti through Linq with a relationship, preference, budget, location, or gifting cadence. Yukti turns those messages into editable person memory. It can also import upcoming Google Calendar dates and manage account-owned jobs such as renewal or appointment follow-up. Senso retrieves the relevant context, and Gemini 3.6 Flash interprets messages and inspects a current merchant page. The user sees the source beside the option and approves one exact merchant, item, amount, and short expiry window.
 
 Only then can Yukti create a scoped Prava sandbox checkout. The credential stays in the server-side transaction path, and Yukti records pending, completed, declined, provider-error, and revoked states without silently retrying an uncertain purchase.
 
-The result is not a chatbot that asks the user to repeat everything. It is a small operating surface for the whole decision: what matters today, what Yukti remembers about each person, the product evidence it found, the permission the user granted, and the transaction consequence.
+The result is not a chatbot that asks the user to repeat everything. It is a small operating surface for what matters today, what Yukti remembers about each person, which tasks need input, the product evidence it found, the permission the user granted, and the transaction consequence. An hourly worker checks due flower rules and sends one idempotent suggestion per due cycle. It cannot approve a purchase.
 
 ## How it works
 
 1. A signed Linq webhook receives a relationship, preference, budget, location, or cadence message.
-2. Yukti saves the facts to the user's D1-backed memory record and keeps each fact correctable or deletable.
-3. Senso retrieves the relevant context for the due gift.
-4. Gemini 3.6 Flash checks the exact live merchant page and returns structured product evidence with a citation.
-5. The user approves the merchant, item, amount, and 15-minute window.
-6. Yukti creates a scoped Prava sandbox session and opens Prava's hosted checkout.
-7. Yukti polls and reconciles the owned session, keeps credentials server-side, and can revoke an open checkout.
+2. Yukti saves explicit facts to the user's D1-backed memory record and keeps each fact correctable or deletable. Ambiguous requests trigger a follow-up question instead of a guess.
+3. Composio imports the user's upcoming Google Calendar dates into Today when the user checks Calendar.
+4. Senso retrieves the relevant context for a due gift or recurring flower rule.
+5. Gemini 3.6 Flash checks the exact live merchant page and returns structured product evidence with a citation.
+6. The user approves the merchant, item, amount, and 15-minute window.
+7. Yukti creates a scoped Prava sandbox session and opens Prava's hosted checkout.
+8. Yukti polls and reconciles the owned session, keeps credentials server-side, and can revoke an open checkout.
 
 ## Technologies used
 
@@ -52,11 +53,11 @@ Choose only tracks exposed by the Devfolio form. The strongest evidence is:
 4. **Localhost Most Startup-Ready Product:** a public, continuing-use product with clear control, privacy, and failure boundaries.
 5. **OpenAI / Codex:** substantive engineering and release work completed with Codex during the build window, if that track is present.
 
-Do not choose a Composio track unless the form allows readiness-only evidence. The calendar connection is real, but Yukti does not claim a completed user-scoped calendar workflow on the public judge account.
+6. **Composio:** the owner account has a user-authorized Google Calendar connection and a verified production event import. Choose this only if the form exposes a matching track.
 
 ## What worked
 
-The public app, GitHub session boundary, Linq memory flow, editable People records, Senso retrieval, Gemini live-page inspection, cited product option, D1 approval, Prava session creation, checkout handoff, polling, revocation, and provider readiness checks work in production. The private owner flow also sent a proactive FTD suggestion through Linq and recorded a single-use USD 45 approval without starting a charge.
+The public app, GitHub session boundary, onboarding, account-owned tasks, Calendar import, Linq memory flow, contextual clarification, editable People records, Senso retrieval, Gemini live-page inspection, cited product option, scheduled due-rule checks, D1 approval, Purchases ledger, Prava session creation, checkout handoff, polling, revocation, and provider readiness checks work in production. The owner flow also sent a proactive FTD suggestion through Linq without starting a charge.
 
 ## What did not fully work
 
@@ -85,7 +86,7 @@ Use the numbered files in the local `devfolio-assets` folder:
 
 ## Final publishing checklist
 
-- Upload the silent 2:06 MP4 to YouTube as **Unlisted** and paste the link.
+- Record the final picture master against `docs/demo-script.md`, QA it scene by scene, upload it to YouTube as **Unlisted**, and paste the link.
 - Upload screenshots in the order above and check that the first image crops well as the cover.
 - Paste the project name, tagline, problem, description, technologies, links, and track evidence.
 - Add every team member and confirm each required RSVP or check-in is complete.

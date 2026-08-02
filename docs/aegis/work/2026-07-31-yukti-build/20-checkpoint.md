@@ -1,10 +1,10 @@
 # Yukti Build Checkpoint
 
-Updated: `2026-07-31`
+Updated: `2026-08-02`
 
 ## Current todo
 
-Capture the proven Linq memory, cited live-merchant recommendation, and exact approval path; keep Prava's provider-pending state explicit; then finish the screenshots, demo video, GitHub publication, and Devfolio submission.
+Finish production visual QA, record the final demo against the current release, and complete the Devfolio submission. Keep Prava's provider-pending state explicit.
 
 ## Active slice
 
@@ -29,7 +29,7 @@ Release gate after the local implementation and provider-integration slices.
 - Composio Calendar is connected as `yukti-owner` after the user explicitly approved the disclosed Google Calendar scopes
 - App-owned GitHub OAuth replaces the unreliable Sign in with ChatGPT dependency for sponsor actions; GitHub grants public-profile access only
 - PKCE, single-use login state, hashed sessions, same-origin mutation checks, per-user and global quotas, provider timeouts, and response hardening protect shared keys
-- Typecheck, lint, 39 tests, rendered-output test, and production build pass
+- Typecheck, lint, 47 tests, rendered-output test, and production build pass
 - Exact-value secret scan reports zero hits in tracked source and built output
 - Canonical Sites production release published at `https://yukti.yashns.chatgpt.site`; the previous project remains available as rollback
 - Hosted Senso retrieval, Gemini brief, D1 approval, Prava sandbox creation, and Prava revocation verified end to end
@@ -39,7 +39,14 @@ Release gate after the local implementation and provider-integration slices.
 - The Prava hosted test-card submission was accepted but remained on `Securing your card details…`; the payment-result API still reported `pending` with no scoped credentials
 - Yukti now has a safe verification endpoint that polls Prava, keeps credentials server-side, reports a deterministic sandbox merchant decline when credentials arrive, and exposes pending truthfully
 - One bounded retry covers Gemini and Senso 502/503/504 responses without retrying timeouts or user actions
-- README, submission copy, demo script, eligibility checklist, and real-versus-simulated disclosure are complete
+- Regular users receive the same Today, People, Purchases, Activity, and Calendar product surfaces as the owner account, with isolated account data
+- Google Calendar imports upcoming events into Today through the connected user's Composio account
+- General tasks support questions, saved answers, status changes, completion, and dismissal
+- Contextual Linq messaging extracts only explicit relationship facts and asks follow-up questions when information is missing
+- An hourly GitHub Actions worker checks due flower rules with quiet hours and idempotency; production dry-run `30742489798` passed
+- Purchases replaces the old Wallet label and provides a durable approval and transaction ledger
+- Gmail was deliberately removed from the product, provider setup, and deployment configuration; Calendar is the only background source
+- README, submission copy, demo script, eligibility checklist, and real-versus-simulated disclosure are current
 
 ## Evidence refs
 
@@ -51,11 +58,11 @@ Release gate after the local implementation and provider-integration slices.
 
 ## Blockers
 
-Prava's hosted sandbox is still provider-pending after the submitted test card. The matching dashboard order remains `Pending`, while the account shows zero transactions, so scoped credential issuance and final status reporting do not yet have attended production evidence. Unattended cadence execution is also not claimed because ChatGPT Sites has no documented scheduler contract. Devfolio video upload and final submission remain open.
+Prava's hosted sandbox is still provider-pending after the submitted test card. The matching dashboard order remains `Pending`, so scoped credential issuance and final status reporting do not yet have attended production evidence. The final demo recording, upload, and Devfolio submission remain open.
 
 ## Next step
 
-Upload the verified local demo video, keep the Prava pending state explicit, and complete the Devfolio submission before the stricter handbook deadline.
+Complete production visual QA, record the final demo against the approved narration, keep the Prava pending state explicit, and submit on Devfolio.
 
 ## Resume state
 

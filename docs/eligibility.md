@@ -5,7 +5,7 @@ Checked against the published Agentic Commerce Hackathon Builder Handbook and li
 ## Required submission items
 
 - [x] Working public demo: <https://yukti.yashns.chatgpt.site>
-- [x] Short demo video recorded locally and QA-verified
+- [ ] Final demo video re-recorded against the current production release and QA-verified
 - [ ] Demo video uploaded and its URL added to Devfolio
 - [x] Judge-access link
 - [x] Repository: <https://github.com/YashSerai/yukti>
@@ -14,7 +14,7 @@ Checked against the published Agentic Commerce Hackathon Builder Handbook and li
 - [x] Partner implementation boundaries documented
 - [x] Pre-existing work disclosure
 - [x] What worked, what did not, and what we learned
-- [x] Screenshots captured from the final production version
+- [ ] Screenshots recaptured from the final production version
 - [ ] Devfolio project published and status verified as **Submitted**
 
 ## Product gate
@@ -34,7 +34,7 @@ Checked against the published Agentic Commerce Hackathon Builder Handbook and li
 - [x] OpenAI: substantive Codex use during implementation, QA, and release
 - [x] Linq: signed messaging is a core interface, and the attended memory and proactive-message flow is proven
 - [x] Localhost Most Startup-Ready Product: the public product has a continuing-use case and a working transaction path
-- [ ] Composio: do not claim a completed calendar workflow; only connection readiness is currently proven
+- [x] Composio: user-authorized Google Calendar connection and production event import are proven on the owner account
 
 ## Submission timing
 
