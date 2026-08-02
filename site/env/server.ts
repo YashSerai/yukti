@@ -10,7 +10,6 @@ const serverEnvSchema = z.object({
   PRAVA_SECRET_KEY: z.string().startsWith("sk_test_").optional(),
   COMPOSIO_API_KEY: z.string().min(1).optional(),
   COMPOSIO_GOOGLE_CALENDAR_AUTH_CONFIG_ID: z.string().regex(/^ac_[A-Za-z0-9_-]+$/).optional(),
-  COMPOSIO_GMAIL_AUTH_CONFIG_ID: z.string().regex(/^ac_[A-Za-z0-9_-]+$/).optional(),
   YUKTI_SCHEDULER_SECRET: z.string().min(32).optional(),
   SENSO_API_KEY: z.string().min(1).optional(),
   LINQ_API_TOKEN: z.string().min(1).optional(),

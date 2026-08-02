@@ -16,11 +16,7 @@ export class ComposioClient {
     return this.toolkitConnection(userId, "googlecalendar");
   }
 
-  async gmailConnection(userId: string) {
-    return this.toolkitConnection(userId, "gmail");
-  }
-
-  async toolkitConnection(userId: string, toolkit: "googlecalendar" | "gmail") {
+  async toolkitConnection(userId: string, toolkit: "googlecalendar") {
     const params = new URLSearchParams({ limit: "20", user_ids: userId, toolkit_slugs: toolkit, statuses: "ACTIVE" });
     const response = await this.fetcher(`https://backend.composio.dev/api/v3.1/connected_accounts?${params}`, {
       signal: AbortSignal.timeout(10_000),
@@ -34,10 +30,6 @@ export class ComposioClient {
 
   async createCalendarLink(userId: string, authConfigId: string, callbackUrl: string) {
     return this.createConnectionLink(userId, authConfigId, callbackUrl, "calendar");
-  }
-
-  async createGmailLink(userId: string, authConfigId: string, callbackUrl: string) {
-    return this.createConnectionLink(userId, authConfigId, callbackUrl, "email");
   }
 
   private async createConnectionLink(userId: string, authConfigId: string, callbackUrl: string, alias: string) {
@@ -59,16 +51,11 @@ export class ComposioClient {
     });
   }
 
-  async fetchRelevantEmails(userId: string, accountId: string, afterDate: string) {
-    return this.execute("GMAIL_FETCH_EMAILS", userId, accountId, undefined,
-      `Fetch at most 20 emails after ${afterDate} that mention a birthday, anniversary, appointment, renewal, reservation, delivery, or deadline. Return message id, subject, date, sender, and a short plain-text snippet only.`);
-  }
-
-  private async execute(tool: string, userId: string, accountId: string, args?: Record<string, unknown>, description?: string) {
+  private async execute(tool: string, userId: string, accountId: string, args: Record<string, unknown>) {
     const response = await this.fetcher(`https://backend.composio.dev/api/v3.1/tools/execute/${tool}`, {
       method: "POST", signal: AbortSignal.timeout(20_000),
       headers: { "x-api-key": this.apiKey, accept: "application/json", "content-type": "application/json" },
-      body: JSON.stringify({ user_id: userId, connected_account_id: accountId, version: "latest", ...(args ? { arguments: args } : { text: description }) }),
+      body: JSON.stringify({ user_id: userId, connected_account_id: accountId, version: "latest", arguments: args }),
     });
     if (!response.ok) throw new Error(`Composio tool request failed with status ${response.status}`);
     const parsed = executeResponse.parse(await response.json());

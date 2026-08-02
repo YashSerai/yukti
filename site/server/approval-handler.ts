@@ -29,7 +29,6 @@ type RuntimeEnv = {
   COMPOSIO_API_KEY?: string;
   COMPOSIO_USER_ID?: string;
   COMPOSIO_GOOGLE_CALENDAR_AUTH_CONFIG_ID?: string;
-  COMPOSIO_GMAIL_AUTH_CONFIG_ID?: string;
   YUKTI_SCHEDULER_SECRET?: string;
   GITHUB_CLIENT_ID?: string;
   GITHUB_CLIENT_SECRET?: string;
@@ -140,9 +139,6 @@ async function providerStatus(env: RuntimeEnv, identity: RequestIdentity) {
   const composio = env.COMPOSIO_API_KEY
     ? await safeCheck(() => new ComposioClient(env.COMPOSIO_API_KEY!).calendarConnection(composioUserId(env, identity)))
     : { ok: false as const, reason: "not_configured" };
-  const gmail = env.COMPOSIO_API_KEY
-    ? await safeCheck(() => new ComposioClient(env.COMPOSIO_API_KEY!).gmailConnection(composioUserId(env, identity)))
-    : { ok: false as const, reason: "not_configured" };
 
   return reply({
     checkedAt: new Date().toISOString(),
@@ -152,7 +148,6 @@ async function providerStatus(env: RuntimeEnv, identity: RequestIdentity) {
       gemini: { state: env.GEMINI_API_KEY && /gemini-[\w.-]*flash[\w.-]*$/i.test(env.GEMINI_MODEL ?? "gemini-3.6-flash") ? "flash_ready" : "not_configured", model: env.GEMINI_MODEL ?? "gemini-3.6-flash" },
       linq: linq.ok ? { state: linq.value.configured ? "healthy" : "not_configured", detail: linq.value.status } : { state: "unavailable" },
       composio: composio.ok && composio.value.connected ? { state: "connected" } : { state: "disconnected", detail: "Calendar permission needed" },
-      gmail: gmail.ok && gmail.value.connected ? { state: "connected" } : { state: "disconnected", detail: "Email permission is optional" },
     },
   }, 200);
 }

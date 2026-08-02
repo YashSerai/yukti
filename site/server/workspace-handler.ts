@@ -1,4 +1,4 @@
-import { calendarTasks, emailTasks, type ImportedTask } from "../domain/task-signals";
+import { calendarTasks, type ImportedTask } from "../domain/task-signals";
 import { ComposioClient } from "../providers/composio/client";
 import type { RequestIdentity } from "./identity";
 
@@ -9,7 +9,6 @@ export type WorkspaceEnv = {
   COMPOSIO_API_KEY?: string;
   COMPOSIO_USER_ID?: string;
   COMPOSIO_GOOGLE_CALENDAR_AUTH_CONFIG_ID?: string;
-  COMPOSIO_GMAIL_AUTH_CONFIG_ID?: string;
 };
 
 const headers = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
@@ -19,7 +18,6 @@ export async function handleWorkspaceRequest(request: Request, env: WorkspaceEnv
   if (url.pathname === "/api/workspace" && request.method === "GET") return json(await workspaceSnapshot(env, identity), 200);
   if (url.pathname === "/api/tasks" && request.method === "POST") return createTask(request, env.DB, identity.id);
   if (url.pathname === "/api/tasks/update" && request.method === "POST") return updateTask(request, env.DB, identity.id);
-  if (url.pathname === "/api/connections/gmail" && request.method === "POST") return connectGmail(env, identity);
   if (url.pathname === "/api/connections/sync" && request.method === "POST") return syncConnections(request, env, identity);
   return null;
 }
@@ -38,15 +36,12 @@ async function workspaceSnapshot(env: WorkspaceEnv, identity: RequestIdentity) {
       LEFT JOIN transactions t ON t.approval_id = a.id WHERE a.user_id = ? ORDER BY a.created_at DESC LIMIT 50`).bind(identity.id).all(),
     env.DB.prepare(`SELECT provider, connected_account_id AS connectedAccountId, last_synced_at AS lastSyncedAt, last_error AS lastError FROM connection_syncs WHERE user_id = ?`).bind(identity.id).all(),
   ]);
-  let calendarConnected = false; let gmailConnected = false;
+  let calendarConnected = false;
   if (env.COMPOSIO_API_KEY) {
     const client = new ComposioClient(env.COMPOSIO_API_KEY); const userId = composioUserId(env, identity);
-    [calendarConnected, gmailConnected] = await Promise.all([
-      client.calendarConnection(userId).then((v) => v.connected).catch(() => false),
-      client.gmailConnection(userId).then((v) => v.connected).catch(() => false),
-    ]);
+    calendarConnected = await client.calendarConnection(userId).then((v) => v.connected).catch(() => false);
   }
-  return { tasks: tasks.results, purchases: purchases.results, connections: { calendarConnected, gmailConnected, syncs: syncs.results } };
+  return { tasks: tasks.results, purchases: purchases.results, connections: { calendarConnected, syncs: syncs.results } };
 }
 
 async function createTask(request: Request, db: D1Database, userId: string) {
@@ -84,37 +79,16 @@ async function updateTask(request: Request, db: D1Database, userId: string) {
   return json({ saved: true }, 200);
 }
 
-async function connectGmail(env: WorkspaceEnv, identity: RequestIdentity) {
-  if (!env.COMPOSIO_API_KEY || !env.COMPOSIO_GMAIL_AUTH_CONFIG_ID) return json({ error: "email_connection_unavailable" }, 503);
-  const callbackUrl = `${env.YUKTI_APP_URL ?? "https://yukti.yashns.chatgpt.site"}/?email=returned`;
-  try {
-    const result = await new ComposioClient(env.COMPOSIO_API_KEY).createGmailLink(composioUserId(env, identity), env.COMPOSIO_GMAIL_AUTH_CONFIG_ID, callbackUrl);
-    return json(result, 201);
-  } catch { return json({ error: "email_connection_failed" }, 502); }
-}
-
 async function syncConnections(request: Request, env: WorkspaceEnv, identity: RequestIdentity) {
   if (!env.COMPOSIO_API_KEY) return json({ error: "connections_unavailable" }, 503);
-  const body = await bodyJson(request); const provider = body.provider === "gmail" ? "gmail" : body.provider === "calendar" ? "calendar" : "all";
   const client = new ComposioClient(env.COMPOSIO_API_KEY); const composioId = composioUserId(env, identity); const now = new Date();
   const results: Record<string, unknown> = {};
-  if (provider === "calendar" || provider === "all") {
-    const connection = await client.calendarConnection(composioId);
-    if (connection.connected) {
-      const payload = await client.listCalendarEvents(composioId, connection.accountId, now.toISOString(), new Date(now.getTime() + 180 * 86_400_000).toISOString());
-      const tasks = calendarTasks(payload); await upsertImported(env.DB, identity.id, tasks, "google_calendar", now.toISOString());
-      await saveSync(env.DB, identity.id, "calendar", connection.accountId, now.toISOString(), null); results.calendar = tasks.length;
-    } else results.calendar = "not_connected";
-  }
-  if (provider === "gmail" || provider === "all") {
-    const connection = await client.gmailConnection(composioId);
-    if (connection.connected) {
-      const after = new Date(now.getTime() - 30 * 86_400_000).toISOString().slice(0, 10);
-      const payload = await client.fetchRelevantEmails(composioId, connection.accountId, after);
-      const tasks = emailTasks(payload, now); await upsertImported(env.DB, identity.id, tasks, "gmail", now.toISOString());
-      await saveSync(env.DB, identity.id, "gmail", connection.accountId, now.toISOString(), null); results.gmail = tasks.length;
-    } else results.gmail = "not_connected";
-  }
+  const connection = await client.calendarConnection(composioId);
+  if (connection.connected) {
+    const payload = await client.listCalendarEvents(composioId, connection.accountId, now.toISOString(), new Date(now.getTime() + 180 * 86_400_000).toISOString());
+    const tasks = calendarTasks(payload); await upsertImported(env.DB, identity.id, tasks, "google_calendar", now.toISOString());
+    await saveSync(env.DB, identity.id, "calendar", connection.accountId, now.toISOString(), null); results.calendar = tasks.length;
+  } else results.calendar = "not_connected";
   return json({ syncedAt: now.toISOString(), results }, 200);
 }
 

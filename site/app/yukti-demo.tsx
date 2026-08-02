@@ -4,9 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { seedCandidates, seedEvents } from "../lib/seed";
-import { ConnectionsView, PurchasesView, WorkspaceToday, type WorkspaceSnapshot } from "./workspace-views";
+import { CalendarView, PurchasesView, WorkspaceToday, type WorkspaceSnapshot } from "./workspace-views";
 
-type View = "Today" | "People" | "Purchases" | "Activity" | "Connections";
+type View = "Today" | "People" | "Purchases" | "Activity" | "Calendar";
 type SandboxSession = { transactionId: string; checkoutUrl: string; expiresAt: string };
 type SandboxOutcome = { state: "pending" | "sandbox_declined" | "completed" | "failed"; scopedCredentialsReceived: boolean; providerConfirmation?: string };
 type PreparationBrief = { summary: string; candidateReasons: Array<{ candidateId: string; reason: string }>; caution: string; model: string };
@@ -150,10 +150,10 @@ export function YuktiDemo() {
     finally { setWorkspaceBusy(false); }
   };
 
-  const syncConnections = async (provider: "calendar" | "gmail" | "all") => {
+  const syncConnections = async () => {
     setWorkspaceBusy(true); setWorkspaceError(null);
     try {
-      const response = await fetch("/api/connections/sync", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ provider }) });
+      const response = await fetch("/api/connections/sync", { method: "POST" });
       if (!response.ok) throw new Error("sync_failed"); await loadWorkspace();
     } catch { setWorkspaceError("Yukti couldn’t check that source. Your existing tasks are unchanged."); }
     finally { setWorkspaceBusy(false); }
@@ -312,7 +312,7 @@ export function YuktiDemo() {
       <header className="topbar">
         <button className="wordmark" onClick={reset} disabled={Boolean(sandboxSession)} aria-label="Reset Yukti"><span>Y</span> Yukti</button>
         <nav aria-label="Primary navigation">
-          {(["Today", "People", "Purchases", "Activity", "Connections"] as View[]).map((item) => (
+          {(["Today", "People", "Purchases", "Activity", "Calendar"] as View[]).map((item) => (
             <button key={item} className={view === item ? "nav-active" : ""} onClick={() => setView(item)}>{item}</button>
           ))}
         </nav>
@@ -510,10 +510,10 @@ function OwnerTask({ eventId, task, busy, onUpdate }: { eventId: string; task?: 
   </div>;
 }
 
-function SecondaryView({ view, authenticated, concierge, conciergeBusy, conciergeError, onReloadConcierge, onUpdateConcierge, onScanFlowers, onApproveProduct, workspace, workspaceBusy, workspaceError, onSyncConnections }: { view: Exclude<View, "Today">; authenticated: boolean; concierge: ConciergeSnapshot | null; conciergeBusy: boolean; conciergeError: string | null; onReloadConcierge: () => Promise<void>; onUpdateConcierge: (path: string, body: Record<string, unknown>) => Promise<unknown>; onScanFlowers: (send: boolean) => Promise<void>; onApproveProduct: (product: ConciergeSnapshot["products"][number]) => Promise<void>; workspace: WorkspaceSnapshot | null; workspaceBusy: boolean; workspaceError: string | null; onSyncConnections: (provider: "calendar" | "gmail" | "all") => Promise<void> }) {
+function SecondaryView({ view, authenticated, concierge, conciergeBusy, conciergeError, onReloadConcierge, onUpdateConcierge, onScanFlowers, onApproveProduct, workspace, workspaceBusy, workspaceError, onSyncConnections }: { view: Exclude<View, "Today">; authenticated: boolean; concierge: ConciergeSnapshot | null; conciergeBusy: boolean; conciergeError: string | null; onReloadConcierge: () => Promise<void>; onUpdateConcierge: (path: string, body: Record<string, unknown>) => Promise<unknown>; onScanFlowers: (send: boolean) => Promise<void>; onApproveProduct: (product: ConciergeSnapshot["products"][number]) => Promise<void>; workspace: WorkspaceSnapshot | null; workspaceBusy: boolean; workspaceError: string | null; onSyncConnections: () => Promise<void> }) {
   if (view === "People") return <PeopleView snapshot={concierge} busy={conciergeBusy} error={conciergeError} authenticated={authenticated} onReload={onReloadConcierge} onUpdate={onUpdateConcierge} onScan={onScanFlowers} onApproveProduct={onApproveProduct} />;
   if (view === "Purchases") return <PurchasesView snapshot={workspace} />;
-  if (view === "Connections") return <ConnectionsView snapshot={workspace} busy={workspaceBusy} error={workspaceError} onSync={onSyncConnections} />;
+  if (view === "Calendar") return <CalendarView snapshot={workspace} busy={workspaceBusy} error={workspaceError} onSync={onSyncConnections} />;
   return <section className="secondary-page"><div className="activity-heading"><h1>Activity</h1><p>A record of changes and approvals in your account.</p></div><div className="audit-list">{concierge?.activity.map((item) => <div key={`${item.createdAt}-${item.kind}`}><time>{new Date(item.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</time><span><strong>{activityLabel(item.kind)}</strong><small>{activityDetail(item.kind, item.detail)}</small></span></div>)}{!concierge?.activity.length && <p className="page-note">Your approvals, memory changes, and checkout results will appear here.</p>}</div></section>;
 }
 

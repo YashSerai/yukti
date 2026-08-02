@@ -26,7 +26,6 @@ const localBindingConfig = (includeLocalSecrets: boolean) => ({
     ...(includeLocalSecrets && process.env.LINQ_WEBHOOK_SECRET ? { LINQ_WEBHOOK_SECRET: process.env.LINQ_WEBHOOK_SECRET } : {}),
     ...(includeLocalSecrets && process.env.COMPOSIO_API_KEY ? { COMPOSIO_API_KEY: process.env.COMPOSIO_API_KEY } : {}),
     ...(process.env.COMPOSIO_GOOGLE_CALENDAR_AUTH_CONFIG_ID ? { COMPOSIO_GOOGLE_CALENDAR_AUTH_CONFIG_ID: process.env.COMPOSIO_GOOGLE_CALENDAR_AUTH_CONFIG_ID } : {}),
-    ...(process.env.COMPOSIO_GMAIL_AUTH_CONFIG_ID ? { COMPOSIO_GMAIL_AUTH_CONFIG_ID: process.env.COMPOSIO_GMAIL_AUTH_CONFIG_ID } : {}),
     ...(includeLocalSecrets && process.env.YUKTI_SCHEDULER_SECRET ? { YUKTI_SCHEDULER_SECRET: process.env.YUKTI_SCHEDULER_SECRET } : {}),
     ...(process.env.COMPOSIO_USER_ID ? { COMPOSIO_USER_ID: process.env.COMPOSIO_USER_ID } : {}),
     ...(process.env.GITHUB_CLIENT_ID ? { GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID } : {}),

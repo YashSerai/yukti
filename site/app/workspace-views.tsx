@@ -14,7 +14,7 @@ export type Purchase = {
 };
 export type WorkspaceSnapshot = {
   tasks: WorkspaceTask[]; purchases: Purchase[];
-  connections: { calendarConnected: boolean; gmailConnected: boolean; syncs: Array<{ provider: string; lastSyncedAt?: string | null; lastError?: string | null }> };
+  connections: { calendarConnected: boolean; syncs: Array<{ provider: string; lastSyncedAt?: string | null; lastError?: string | null }> };
 };
 
 const money = (amount: number, currency: string) => new Intl.NumberFormat("en-CA", { style: "currency", currency }).format(amount / 100);
@@ -63,16 +63,14 @@ export function PurchasesView({ snapshot }: { snapshot: WorkspaceSnapshot | null
   </section>;
 }
 
-export function ConnectionsView({ snapshot, busy, error, onSync }: { snapshot: WorkspaceSnapshot | null; busy: boolean; error: string | null; onSync: (provider: "calendar" | "gmail" | "all") => Promise<void> }) {
-  const connect = async (kind: "calendar" | "gmail") => {
-    const endpoint = kind === "calendar" ? "/api/onboarding/calendar" : "/api/connections/gmail";
-    const response = await fetch(endpoint, { method: "POST" }); const result = await response.json() as { redirectUrl?: string };
+export function CalendarView({ snapshot, busy, error, onSync }: { snapshot: WorkspaceSnapshot | null; busy: boolean; error: string | null; onSync: () => Promise<void> }) {
+  const connect = async () => {
+    const response = await fetch("/api/onboarding/calendar", { method: "POST" }); const result = await response.json() as { redirectUrl?: string };
     if (response.ok && result.redirectUrl) window.location.assign(result.redirectUrl);
   };
-  const calendarSync = snapshot?.connections.syncs.find((item) => item.provider === "calendar"); const gmailSync = snapshot?.connections.syncs.find((item) => item.provider === "gmail");
-  return <section className="secondary-page connections-page"><div className="connections-heading"><h1>Connections</h1><p>Choose where Yukti should look for dates and deadlines. Email is optional.</p></div>{error && <p className="inline-error" role="alert">{error}</p>}
-    <div className="connection-ledger"><ConnectionRow title="Google Calendar" detail="Birthdays, appointments, reservations, and other upcoming events." connected={Boolean(snapshot?.connections.calendarConnected)} syncedAt={calendarSync?.lastSyncedAt} busy={busy} onConnect={() => connect("calendar")} onSync={() => onSync("calendar")} /><ConnectionRow title="Gmail" detail="Recent messages that mention appointments, renewals, deliveries, or important dates." connected={Boolean(snapshot?.connections.gmailConnected)} syncedAt={gmailSync?.lastSyncedAt} busy={busy} onConnect={() => connect("gmail")} onSync={() => onSync("gmail")} /></div>
-    {(snapshot?.connections.calendarConnected || snapshot?.connections.gmailConnected) && <button className="primary sync-all" onClick={() => void onSync("all")} disabled={busy}>{busy ? "Checking..." : "Check all connected sources"}</button>}
+  const calendarSync = snapshot?.connections.syncs.find((item) => item.provider === "calendar");
+  return <section className="secondary-page connections-page"><div className="connections-heading"><h1>Calendar</h1><p>Bring birthdays, appointments, reservations, and deadlines into your Yukti day.</p></div>{error && <p className="inline-error" role="alert">{error}</p>}
+    <div className="connection-ledger"><ConnectionRow title="Google Calendar" detail="Yukti imports upcoming events when you ask it to check. Your calendar remains the source of truth." connected={Boolean(snapshot?.connections.calendarConnected)} syncedAt={calendarSync?.lastSyncedAt} busy={busy} onConnect={connect} onSync={onSync} /></div>
   </section>;
 }
 
@@ -80,6 +78,6 @@ function ConnectionRow({ title, detail, connected, syncedAt, busy, onConnect, on
   return <article><div><span>{connected ? "Connected" : "Not connected"}</span><h2>{title}</h2><p>{detail}</p>{syncedAt && <small>Last checked {new Date(syncedAt).toLocaleString()}</small>}</div><button onClick={connected ? onSync : onConnect} disabled={busy}>{connected ? "Check now" : "Connect"}</button></article>;
 }
 function taskState(task: WorkspaceTask) { if (task.requiredQuestion && !task.answer) return "Needs an answer"; if (task.kind === "occasion") return "Occasion"; if (task.kind === "appointment") return "Appointment"; return task.status === "watching" ? "Watching" : task.status.replace(/_/g, " "); }
-function sourceName(source: string) { return source === "google_calendar" ? "From Google Calendar" : source === "gmail" ? "From Gmail" : source === "linq" ? "From your messages" : "Added in Yukti"; }
+function sourceName(source: string) { return source === "google_calendar" ? "From Google Calendar" : source === "linq" ? "From your messages" : "Added in Yukti"; }
 function defaultDescription(task: WorkspaceTask) { return task.kind === "occasion" ? "Yukti can help prepare a thoughtful gift before this date." : task.kind === "appointment" ? "Yukti will keep this appointment visible and surface anything that needs preparation." : "Yukti will keep this on your list until you complete or dismiss it."; }
 function purchaseState(item: Purchase, now: number) { return item.transactionState ? item.transactionState.replace(/_/g, " ") : item.consumedAt ? "Checkout started" : Date.parse(item.expiresAt) > now ? "Approved" : "Approval expired"; }

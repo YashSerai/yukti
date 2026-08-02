@@ -18,7 +18,7 @@ Make the signed-in product one account-owned concierge for every user. Today mus
 
 ## Technology
 
-Vinext/React, Cloudflare Worker runtime, managed D1, Composio Google Calendar and Gmail tools, Linq, Senso, Gemini Flash, Prava sandbox, Vitest, ESLint, ChatGPT Sites, GitHub Actions.
+Vinext/React, Cloudflare Worker runtime, managed D1, Composio Google Calendar tools, Linq, Senso, Gemini Flash, Prava sandbox, Vitest, ESLint, ChatGPT Sites, GitHub Actions.
 
 ## Baseline and compatibility
 
@@ -45,7 +45,7 @@ Vinext/React, Cloudflare Worker runtime, managed D1, Composio Google Calendar an
 ## Work batches
 
 1. Add additive schema and domain contracts for tasks, task answers, connection sync, clarification, and scheduled runs.
-2. Implement Composio calendar import and optional Gmail signal extraction, plus connection/sync APIs.
+2. Implement Composio Calendar import plus connection and sync APIs.
 3. Implement generalized task CRUD/action APIs, unified Today snapshot, and Purchases ledger.
 4. Implement contextual Linq clarification and explicit-memory persistence through Gemini Flash with deterministic fallback.
 5. Implement signed proactive scheduler, dry-run behavior, quiet hours, and idempotent message preparation.
