@@ -7,7 +7,7 @@ const timestamps = {
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(), chatgptUserId: text("chatgpt_user_id").notNull().unique(),
-  displayName: text("display_name").notNull(), timezone: text("timezone").notNull().default("America/Vancouver"), ...timestamps,
+  displayName: text("display_name").notNull(), timezone: text("timezone").notNull().default("America/Vancouver"), onboardingCompletedAt: text("onboarding_completed_at"), ...timestamps,
 });
 export const people = sqliteTable("people", {
   id: text("id").primaryKey(), userId: text("user_id").notNull().references(() => users.id),
@@ -66,6 +66,11 @@ export const conciergeProfiles = sqliteTable("concierge_profiles", {
   userId: text("user_id").primaryKey().references(() => users.id), phoneE164: text("phone_e164").notNull().unique(),
   proactiveEnabled: integer("proactive_enabled", { mode: "boolean" }).notNull().default(true),
   quietStartHour: integer("quiet_start_hour").notNull().default(21), quietEndHour: integer("quiet_end_hour").notNull().default(8), ...timestamps,
+});
+export const linqPairings = sqliteTable("linq_pairings", {
+  userId: text("user_id").primaryKey().references(() => users.id), phoneE164: text("phone_e164").notNull().unique(),
+  codeHash: text("code_hash").notNull(), expiresAt: integer("expires_at").notNull(), verifiedAt: integer("verified_at"),
+  attemptCount: integer("attempt_count").notNull().default(0), ...timestamps,
 });
 export const conversations = sqliteTable("conversations", {
   id: text("id").primaryKey(), userId: text("user_id").notNull().references(() => users.id), provider: text("provider").notNull(),

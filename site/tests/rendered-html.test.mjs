@@ -10,15 +10,14 @@ async function render() {
   }, { waitUntil() {}, passThroughOnException() {} });
 }
 
-test("server-renders the Yukti judge experience", async () => {
+test("server-renders the signed-out Yukti product landing page", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
   assert.match(html, /<title>Yukti \| Thoughtful gifts, prepared<\/title>/i);
-  assert.match(html, /Sarah(?:’|&#x27;|')s birthday/);
-  assert.match(html, /Purchase approval/);
-  assert.match(html, /Upcoming/);
-  assert.match(html, /Sign in to approve/);
-  assert.doesNotMatch(html, /Your site is taking shape|react-loading-skeleton|Private by design|Memory connected|seeded|fixture|sponsor integration/i);
+  assert.match(html, /Thoughtful gifts, without starting from scratch/);
+  assert.match(html, /Get started with GitHub/);
+  assert.match(html, /Remember the person/);
+  assert.doesNotMatch(html, /Sarah|Purchase approval|Upcoming|Your site is taking shape|react-loading-skeleton|Private by design|Memory connected|seeded|fixture|sponsor integration/i);
 });

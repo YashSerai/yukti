@@ -1,10 +1,11 @@
 import { conciergeReply, parseConciergeMessage } from "../domain/concierge";
 import { LinqClient } from "../providers/linq/client";
-import { isAllowedLinqEvent, linqInboundEvent, verifyLinqWebhook } from "../providers/linq/webhook";
+import { isAllowedLinqLineEvent, linqInboundEvent, verifyLinqWebhook } from "../providers/linq/webhook";
 import { fetchFlowerProducts } from "../providers/products/flowers";
 import { SensoClient } from "../providers/senso/client";
 import { GeminiFlashClient } from "../providers/gemini/client";
 import type { RequestIdentity } from "./identity";
+import { resolveLinqUser } from "./onboarding-handler";
 
 export type ConciergeEnv = {
   DB: D1Database;
@@ -29,24 +30,34 @@ export async function handleLinqWebhook(request: Request, env: ConciergeEnv) {
   try { event = linqInboundEvent.parse(JSON.parse(rawBody)); }
   catch { return json({ error: "unsupported_event" }, 400); }
 
-  if (!env.LINQ_PHONE_NUMBER || !env.LINQ_OWNER_PHONE || !isAllowedLinqEvent(event, env.LINQ_PHONE_NUMBER, env.LINQ_OWNER_PHONE)) {
+  if (!env.LINQ_PHONE_NUMBER || !isAllowedLinqLineEvent(event, env.LINQ_PHONE_NUMBER)) {
     return json({ accepted: false, reason: "recipient_not_allowed" }, 202);
   }
 
-  const ownerLogin = env.YUKTI_OWNER_GITHUB_LOGIN ?? "YashSerai";
-  const owner = await env.DB.prepare(`SELECT u.id, u.display_name FROM users u JOIN github_identities g ON g.user_id = u.id WHERE lower(g.login) = lower(?)`)
-    .bind(ownerLogin).first<{ id: string; display_name: string }>();
-  if (!owner) return json({ accepted: false, reason: "owner_not_connected" }, 202);
+  const phone = event.data.sender_handle.handle;
+  const text = event.data.parts.filter((part): part is { type: "text"; value: string } => part.type === "text").map((part) => part.value).join("\n").trim().slice(0, 4_000);
+  if (!text) return json({ accepted: true, ignored: "no_text" }, 200);
+  const resolved = await resolveLinqUser(env.DB, phone, text);
+  if (!resolved) return json({ accepted: false, reason: "number_not_connected" }, 202);
+  const owner = resolved.user;
 
   const receipt = await env.DB.prepare(`INSERT OR IGNORE INTO webhook_receipts (event_id, provider, event_type, received_at) VALUES (?, 'linq', ?, ?)`)
     .bind(event.event_id, event.event_type, new Date().toISOString()).run();
   if ((receipt.meta.changes ?? 0) === 0) return json({ accepted: true, duplicate: true }, 200);
 
   const now = new Date().toISOString();
-  await ensureProfile(env.DB, owner.id, env.LINQ_OWNER_PHONE, now);
-  const conversationId = await ensureConversation(env.DB, owner.id, event.data.chat.id, env.LINQ_OWNER_PHONE, now);
-  const text = event.data.parts.filter((part): part is { type: "text"; value: string } => part.type === "text").map((part) => part.value).join("\n").trim().slice(0, 4_000);
-  if (!text) return json({ accepted: true, ignored: "no_text" }, 200);
+  const conversationId = await ensureConversation(env.DB, owner.id, event.data.chat.id, phone, now);
+  if (resolved.pairedNow) {
+    const welcome = "You're connected to Yukti. Next, add someone you care about in the app or text me who they are and what they like.";
+    if (env.LINQ_API_TOKEN) {
+      try {
+        const sent = await new LinqClient(env.LINQ_API_TOKEN, env.LINQ_PHONE_NUMBER).sendApprovedMessage(phone, welcome);
+        await env.DB.prepare(`INSERT INTO messages (id, user_id, conversation_id, provider_event_id, provider_message_id, direction, body, processing_state, created_at, updated_at)
+          VALUES (?, ?, ?, NULL, ?, 'outbound', ?, 'sent', ?, ?)`).bind(crypto.randomUUID(), owner.id, conversationId, sent.messageId, welcome, now, now).run();
+      } catch { /* Pairing remains valid even if the confirmation reply is unavailable. */ }
+    }
+    return json({ accepted: true, paired: true }, 200);
+  }
   const messageId = crypto.randomUUID();
   await env.DB.prepare(`INSERT INTO messages (id, user_id, conversation_id, provider_event_id, provider_message_id, direction, body, processing_state, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, 'inbound', ?, 'processing', ?, ?)`)
@@ -64,7 +75,7 @@ export async function handleLinqWebhook(request: Request, env: ConciergeEnv) {
   const reply = conciergeReply(parsed);
   if (env.LINQ_API_TOKEN) {
     try {
-      const sent = await new LinqClient(env.LINQ_API_TOKEN, env.LINQ_PHONE_NUMBER).sendApprovedMessage(env.LINQ_OWNER_PHONE, reply);
+      const sent = await new LinqClient(env.LINQ_API_TOKEN, env.LINQ_PHONE_NUMBER).sendApprovedMessage(phone, reply);
       const sentAt = new Date().toISOString();
       await env.DB.prepare(`INSERT INTO messages (id, user_id, conversation_id, provider_event_id, provider_message_id, direction, body, processing_state, created_at, updated_at)
         VALUES (?, ?, ?, NULL, ?, 'outbound', ?, 'sent', ?, ?)`)
@@ -80,12 +91,7 @@ export async function handleLinqWebhook(request: Request, env: ConciergeEnv) {
 export async function handleConciergeRequest(request: Request, env: ConciergeEnv, identity: RequestIdentity): Promise<Response | null> {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/api/concierge")) return null;
-  const ownerLogin = env.YUKTI_OWNER_GITHUB_LOGIN ?? "YashSerai";
-  const isOwner = identity.login?.toLowerCase() === ownerLogin.toLowerCase();
-  if (!isOwner) return request.method === "GET" ? json(seededSnapshot(), 200) : json({ error: "owner_access_required" }, 403);
-  if (!env.LINQ_OWNER_PHONE) return json({ error: "owner_phone_not_configured" }, 503);
   const now = new Date().toISOString();
-  await ensureProfile(env.DB, identity.id, env.LINQ_OWNER_PHONE, now);
 
   if (url.pathname === "/api/concierge" && request.method === "GET") return json(await connectedSnapshot(env.DB, identity.id), 200);
   if (url.pathname === "/api/concierge/facts" && request.method === "POST") return createFact(request, env.DB, identity.id, now);
@@ -98,14 +104,15 @@ export async function handleConciergeRequest(request: Request, env: ConciergeEnv
 }
 
 async function connectedSnapshot(db: D1Database, userId: string) {
-  const [people, facts, rules, messages, products] = await Promise.all([
+  const [people, facts, rules, messages, products, activity] = await Promise.all([
     db.prepare(`SELECT id, name, relationship, notes, updated_at AS updatedAt FROM people WHERE user_id = ? ORDER BY updated_at DESC`).bind(userId).all(),
     db.prepare(`SELECT id, person_id AS personId, fact, kind, value, status, origin, source, confidence, created_at AS createdAt FROM memory_facts WHERE user_id = ? ORDER BY created_at DESC`).bind(userId).all(),
     db.prepare(`SELECT r.id, r.person_id AS personId, p.name AS personName, r.kind, r.cadence_days AS cadenceDays, r.maximum_amount_minor AS maximumAmountMinor, r.currency, r.enabled, r.next_eligible_at AS nextEligibleAt, r.last_prepared_at AS lastPreparedAt FROM proactive_rules r JOIN people p ON p.id = r.person_id WHERE r.user_id = ? ORDER BY r.created_at DESC`).bind(userId).all(),
     db.prepare(`SELECT direction, body, processing_state AS processingState, created_at AS createdAt FROM messages WHERE user_id = ? ORDER BY created_at DESC LIMIT 12`).bind(userId).all(),
-    db.prepare(`SELECT id, rule_id AS ruleId, merchant, title, amount_minor AS amountMinor, currency, url, image_url AS imageUrl, availability, source_kind AS sourceKind, evidence, retrieved_at AS retrievedAt FROM product_snapshots WHERE user_id = ? AND evidence LIKE '%"groundedResearch"%' ORDER BY retrieved_at DESC LIMIT 1`).bind(userId).all(),
+    db.prepare(`SELECT s.id, s.rule_id AS ruleId, p.name AS personName, s.merchant, s.title, s.amount_minor AS amountMinor, s.currency, s.url, s.image_url AS imageUrl, s.availability, s.source_kind AS sourceKind, s.evidence, s.retrieved_at AS retrievedAt FROM product_snapshots s LEFT JOIN proactive_rules r ON r.id = s.rule_id LEFT JOIN people p ON p.id = r.person_id WHERE s.user_id = ? AND s.evidence LIKE '%"groundedResearch"%' ORDER BY s.retrieved_at DESC LIMIT 3`).bind(userId).all(),
+    db.prepare(`SELECT kind, detail, created_at AS createdAt FROM audit_events WHERE user_id = ? ORDER BY created_at DESC LIMIT 20`).bind(userId).all(),
   ]);
-  return { mode: "connected", people: people.results, facts: facts.results, rules: rules.results, messages: messages.results, products: products.results };
+  return { mode: "connected", people: people.results, facts: facts.results, rules: rules.results, messages: messages.results, products: products.results, activity: activity.results };
 }
 
 async function createFact(request: Request, db: D1Database, userId: string, now: string) {
@@ -199,9 +206,10 @@ async function scanForFlowers(request: Request, env: ConciergeEnv, userId: strin
   }
 
   let messageSent = false;
-  if (send && env.LINQ_API_TOKEN && env.LINQ_PHONE_NUMBER && env.LINQ_OWNER_PHONE) {
+  const profile = await env.DB.prepare("SELECT phone_e164 AS phone FROM concierge_profiles WHERE user_id = ? LIMIT 1").bind(userId).first<{ phone: string }>();
+  if (send && env.LINQ_API_TOKEN && env.LINQ_PHONE_NUMBER && profile?.phone) {
     const amount = (selected.amountMinor / 100).toFixed(0);
-    await new LinqClient(env.LINQ_API_TOKEN, env.LINQ_PHONE_NUMBER).sendApprovedMessage(env.LINQ_OWNER_PHONE,
+    await new LinqClient(env.LINQ_API_TOKEN, env.LINQ_PHONE_NUMBER).sendApprovedMessage(profile.phone,
       `It has been a while since you planned flowers for ${rule.person_name}. I found ${selected.title} at ${selected.merchant}, starting at $${amount} USD. I saved the live option in Yukti for you to review.`);
     messageSent = true;
   }
@@ -234,20 +242,12 @@ async function ensurePerson(db: D1Database, userId: string, rawName: string, rel
   return id;
 }
 
-async function ensureProfile(db: D1Database, userId: string, phone: string, now: string) {
-  return db.prepare(`INSERT INTO concierge_profiles (user_id, phone_e164, proactive_enabled, quiet_start_hour, quiet_end_hour, created_at, updated_at) VALUES (?, ?, 1, 21, 8, ?, ?) ON CONFLICT(user_id) DO UPDATE SET phone_e164 = excluded.phone_e164, updated_at = excluded.updated_at`).bind(userId, phone, now, now).run();
-}
-
 async function ensureConversation(db: D1Database, userId: string, providerChatId: string, phone: string, now: string) {
   const existing = await db.prepare(`SELECT id FROM conversations WHERE provider_chat_id = ? AND user_id = ?`).bind(providerChatId, userId).first<{ id: string }>();
   if (existing) return existing.id;
   const id = crypto.randomUUID(); await db.prepare(`INSERT INTO conversations (id, user_id, provider, provider_chat_id, participant_e164, status, created_at, updated_at) VALUES (?, ?, 'linq', ?, ?, 'active', ?, ?)`).bind(id, userId, providerChatId, phone, now, now).run(); return id;
 }
 
-function seededSnapshot() {
-  return { mode: "seeded", people: [{ id: "person-sarah", name: "Sarah", relationship: "Friend", updatedAt: "Recently" }],
-    facts: [{ id: "seed-tea", personId: "person-sarah", fact: "Sarah likes jasmine tea", kind: "preference", value: "jasmine tea", status: "confirmed", origin: "seeded", source: "Saved in Yukti", confidence: 100 }], rules: [], messages: [], products: [] };
-}
 async function bodyJson(request: Request): Promise<Record<string, unknown>> { try { return await request.json() as Record<string, unknown>; } catch { return {}; } }
 function string(value: unknown, length: number) { return typeof value === "string" ? value.trim().slice(0, length) : ""; }
 function integer(value: unknown, minimum: number, maximum: number) { const number = Number(value); return Number.isInteger(number) && number >= minimum && number <= maximum ? number : 0; }

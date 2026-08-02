@@ -1,0 +1,28 @@
+@media (max-width:760px) {
+  .landing-nav { height:68px; }
+  .landing-wordmark { font-size:34px; }
+  .landing-nav nav a:first-child { display:none; }
+  .landing-hero { min-height:auto; grid-template-columns:1fr; }
+  .landing-copy { padding:70px 22px 55px; }
+  .landing-copy h1 { font-size:58px; }
+  .landing-actions { align-items:flex-start; flex-direction:column; }
+  .gift-still { min-height:500px; }
+  .gift-box { width:60%; height:230px; }
+  .gift-lid { width:66%; bottom:calc(15% + 216px); }
+  .gift-note { left:7%; width:170px; padding:25px 16px; font-size:19px; }
+  .brass-dish { right:2%; width:160px; }
+  .stem { right:-22%; }
+  .landing-method { grid-template-columns:1fr; padding:55px 22px; }
+  .landing-method > div,.landing-method > div:first-child { min-height:auto; padding:30px 0; border-left:0; border-top:1px solid rgba(27,58,45,.2); }
+  .landing-method > div:first-child { border-top:0; }
+  .landing-method h2 { margin:26px 0 10px; }
+  .landing-footer { min-height:120px; }
+  .onboarding-shell { grid-template-rows:68px 1fr; background:var(--paper); }
+  .onboarding-shell > header { padding:0 18px; }
+  .onboarding-shell > header span { display:none; }
+  .onboarding-card { width:100%; min-height:calc(100vh - 68px); margin:0; padding:42px 22px; box-shadow:none; }
+  .onboarding-step h1 { font-size:48px; }
+  .pairing-instruction strong { font-size:26px; }
+  .member-today { padding:50px 18px; background:var(--paper); }
+  .member-today-head h1 { font-size:56px; }
+}

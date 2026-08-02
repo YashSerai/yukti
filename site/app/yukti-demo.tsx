@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { seedAudit, seedCandidates, seedEvents } from "../lib/seed";
+import Link from "next/link";
+import Image from "next/image";
+import { seedCandidates, seedEvents } from "../lib/seed";
 
 type View = "Today" | "People" | "Wallet" | "Audit";
 type SandboxSession = { transactionId: string; checkoutUrl: string; expiresAt: string };
@@ -9,13 +11,18 @@ type SandboxOutcome = { state: "pending" | "sandbox_declined" | "completed" | "f
 type PreparationBrief = { summary: string; candidateReasons: Array<{ candidateId: string; reason: string }>; caution: string; model: string };
 type ProviderStatus = { checkedAt: string; providers: Record<string, { state: string; detail?: string; model?: string }> };
 type GitHubUser = { login: string; displayName: string };
+type OnboardingStatus = {
+  isOwner: boolean; complete: boolean; phoneConnected: boolean; phone: string | null; pairingPending: boolean;
+  pairingExpiresAt: string | null; peopleCount: number; calendarConnected: boolean; linqNumber: string | null;
+};
 type ConciergeSnapshot = {
-  mode: "connected" | "seeded";
+  mode: "connected";
   people: Array<{ id: string; name: string; relationship: string; updatedAt?: string }>;
   facts: Array<{ id: string; personId: string; fact: string; kind: string; value: string; status: string; origin: string; source: string; confidence: number; createdAt?: string }>;
   rules: Array<{ id: string; personId: string; personName: string; kind: string; cadenceDays: number; maximumAmountMinor: number; currency: string; enabled: number | boolean; nextEligibleAt: string; lastPreparedAt?: string | null }>;
   messages: Array<{ direction: string; body: string; processingState: string; createdAt: string }>;
-  products: Array<{ id: string; merchant: string; title: string; amountMinor: number; currency: string; url: string; imageUrl?: string | null; availability: string; sourceKind: string; evidence: string; retrievedAt: string }>;
+  products: Array<{ id: string; personName?: string | null; merchant: string; title: string; amountMinor: number; currency: string; url: string; imageUrl?: string | null; availability: string; sourceKind: string; evidence: string; retrievedAt: string }>;
+  activity: Array<{ kind: string; detail: string; createdAt: string }>;
 };
 
 const money = (amount: number, currency: string) => new Intl.NumberFormat("en-CA", { style: "currency", currency }).format(amount / 100);
@@ -27,7 +34,7 @@ const connectionLabel = (state: string) => {
   return "Unavailable";
 };
 
-const providerLabel = (name: string) => ({ prava: "Prava", senso: "Senso", gemini: "Gemini", linq: "Linq", composio: "Composio" })[name.toLowerCase()] ?? name;
+const providerLabel = (name: string) => ({ prava: "Checkout", senso: "Memory", gemini: "Product research", linq: "Messages", composio: "Calendar" })[name.toLowerCase()] ?? name;
 
 const factSourceLabel = (source: string) => /^linq\b/i.test(source) ? "From your messages" : "Added in Yukti";
 
@@ -42,10 +49,12 @@ const memoryDisplayValue = (fact: ConciergeSnapshot["facts"][number]) => {
 
 export function YuktiDemo() {
   const [user, setUser] = useState<GitHubUser | null>(null);
+  const [authResolved, setAuthResolved] = useState(false);
+  const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null);
   const [view, setView] = useState<View>("Today");
   const [selectedEvent, setSelectedEvent] = useState<string>(seedEvents[0].id);
   const [selectedCandidate, setSelectedCandidate] = useState<string>(seedCandidates[0].id);
-  const [approvedProduct, setApprovedProduct] = useState<{ id: string; merchant: string; title: string; price: number; currency: string } | null>(null);
+  const [approvedProduct, setApprovedProduct] = useState<{ id: string; personName?: string | null; merchant: string; title: string; price: number; currency: string } | null>(null);
   const [reviewing, setReviewing] = useState(false);
   const [approved, setApproved] = useState(false);
   const [approvalId, setApprovalId] = useState<string | null>(null);
@@ -69,9 +78,18 @@ export function YuktiDemo() {
   useEffect(() => {
     void fetch("/api/me", { cache: "no-store" }).then(async (response) => {
       if (!response.ok) return;
-      const result = await response.json() as { user?: GitHubUser };
+      const result = await response.json() as { user?: GitHubUser; onboarding?: OnboardingStatus };
       if (result.user) setUser(result.user);
-    }).catch(() => undefined);
+      if (result.onboarding) setOnboarding(result.onboarding);
+    }).catch(() => undefined).finally(() => setAuthResolved(true));
+  }, []);
+
+  const refreshIdentity = useCallback(async () => {
+    const response = await fetch("/api/me", { cache: "no-store" });
+    if (!response.ok) throw new Error("identity_unavailable");
+    const result = await response.json() as { user: GitHubUser; onboarding: OnboardingStatus };
+    setUser(result.user); setOnboarding(result.onboarding);
+    return result.onboarding;
   }, []);
 
   const loadConcierge = useCallback(async () => {
@@ -145,7 +163,7 @@ export function YuktiDemo() {
 
   const logout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
-    setUser(null); reset();
+    setUser(null); setOnboarding(null); setConcierge(null); reset();
   };
 
   const reset = () => {
@@ -243,11 +261,16 @@ export function YuktiDemo() {
       const response = await fetch("/api/approvals", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ productSnapshotId: product.id }) });
       const result = await response.json() as { approval?: { id: string }; error?: string };
       if (!response.ok || !result.approval) throw new Error(result.error ?? "approval_failed");
-      setApprovedProduct({ id: `live-${product.id}`, merchant: product.merchant, title: product.title, price: product.amountMinor, currency: product.currency });
-      setApprovalId(result.approval.id); setApproved(true); setView("Today"); setSelectedEvent("evt-sarah");
+      setApprovedProduct({ id: `live-${product.id}`, personName: product.personName, merchant: product.merchant, title: product.title, price: product.amountMinor, currency: product.currency });
+      setApprovalId(result.approval.id); setApproved(true); setView("Today");
     } catch { setConciergeError("Couldn’t approve that option. Check the merchant page again and retry."); }
     finally { setApprovalBusy(false); }
   };
+
+  if (!authResolved) return <LandingPage />;
+  if (!user) return <LandingPage />;
+  if (!onboarding) return <ProductError onRetry={() => void refreshIdentity()} />;
+  if (!onboarding.complete) return <OnboardingFlow user={user} status={onboarding} onStatus={setOnboarding} onComplete={refreshIdentity} onSignOut={logout} />;
 
   return (
     <main className="app-shell">
@@ -258,11 +281,10 @@ export function YuktiDemo() {
             <button key={item} className={view === item ? "nav-active" : ""} onClick={() => setView(item)}>{item === "Audit" ? "Activity" : item}</button>
           ))}
         </nav>
-        {user ? <div className="auth-control"><span title={user.displayName}>@{user.login}</span><button onClick={logout}>Sign out</button></div>
-          : <a className="auth-control sign-in" href="/api/auth/github/start?return_to=/">Sign in</a>}
+        <div className="auth-control"><span title={user.displayName}>@{user.login}</span><button onClick={logout}>Sign out</button></div>
       </header>
 
-      {view === "Today" ? (
+      {view === "Today" ? (onboarding.isOwner ? (
         <section className="today-grid">
           <aside className="calendar-panel" aria-label="Upcoming events">
             <div className="eyebrow">August 2026</div>
@@ -318,7 +340,7 @@ export function YuktiDemo() {
             )}
           </article>
         </section>
-      ) : <SecondaryView view={view} providerStatus={providerStatus} statusBusy={statusBusy} statusError={statusError} authenticated={Boolean(user)} onCheckProviders={checkProviders}
+      ) : <MemberToday snapshot={concierge} busy={conciergeBusy} approved={approved} approvedProduct={approvedProduct} approvalId={approvalId} sandboxSession={sandboxSession} sandboxOutcome={sandboxOutcome} paymentBusy={paymentBusy} paymentError={paymentError} onPeople={() => setView("People")} onApproveProduct={approveProduct} onStartPrava={startPrava} onVerifyPrava={verifyPrava} onCancelPrava={cancelPrava} />) : <SecondaryView view={view} providerStatus={providerStatus} statusBusy={statusBusy} statusError={statusError} authenticated={Boolean(user)} onCheckProviders={checkProviders}
         concierge={concierge} conciergeBusy={conciergeBusy} conciergeError={conciergeError} onReloadConcierge={loadConcierge} onUpdateConcierge={updateConcierge} onScanFlowers={scanFlowers} onApproveProduct={approveProduct} />}
 
       {reviewing && (
@@ -338,6 +360,114 @@ export function YuktiDemo() {
   );
 }
 
+function ProductError({ onRetry }: { onRetry: () => void }) {
+  return <main className="product-error"><Link className="landing-wordmark" href="/">Yukti</Link><h1>We couldn&apos;t open your account.</h1><p>Your data was not changed.</p><button className="primary" onClick={onRetry}>Try again</button></main>;
+}
+
+function LandingPage() {
+  return <main className="landing-page">
+    <header className="landing-nav"><a className="landing-wordmark" href="#top">Yukti</a><nav aria-label="Landing page"><a href="#how">How it works</a><a className="landing-sign-in" href="/api/auth/github/start?return_to=/">Sign in</a></nav></header>
+    <section className="landing-hero" id="top">
+      <div className="landing-copy"><p className="eyebrow brass">A gifting concierge that remembers</p><h1>Thoughtful gifts, without starting from scratch.</h1><p className="landing-lede">Tell Yukti who matters to you, what they like, and what you usually spend. It keeps those details ready, finds a current option when the time is right, and waits for your approval before checkout.</p><div className="landing-actions"><a className="primary" href="/api/auth/github/start?return_to=/">Get started with GitHub</a><a href="#how">See how it works</a></div><small>GitHub is used only to keep each account separate.</small></div>
+      <div className="gift-still" aria-hidden="true"><div className="gift-lid" /><div className="gift-box"><span className="ribbon-vertical" /><span className="ribbon-horizontal" /></div><div className="gift-note">For someone<br />you know well.</div><div className="brass-dish" /><div className="stem stem-one" /><div className="stem stem-two" /></div>
+    </section>
+    <section className="landing-method" id="how"><div><span>01</span><h2>Remember the person</h2><p>Save only what you tell Yukti through your messages or account.</p></div><div><span>02</span><h2>Prepare the gift</h2><p>Yukti checks a current merchant page against the person, place, and budget.</p></div><div><span>03</span><h2>Approve the purchase</h2><p>You review the exact item, merchant, amount, and expiry before checkout opens.</p></div></section>
+    <footer className="landing-footer"><span>Yukti</span><a href="/api/auth/github/start?return_to=/">Open your account</a></footer>
+  </main>;
+}
+
+function OnboardingFlow({ user, status, onStatus, onComplete, onSignOut }: { user: GitHubUser; status: OnboardingStatus; onStatus: (status: OnboardingStatus) => void; onComplete: () => Promise<OnboardingStatus>; onSignOut: () => Promise<void> }) {
+  const [phone, setPhone] = useState("");
+  const [pairing, setPairing] = useState<{ code: string; message: string; linqNumber: string; expiresAt: string } | null>(null);
+  const [name, setName] = useState("");
+  const [relationship, setRelationship] = useState("");
+  const [personSaved, setPersonSaved] = useState(status.peopleCount > 0);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    const response = await fetch("/api/onboarding", { cache: "no-store" });
+    if (!response.ok) return null;
+    const next = await response.json() as OnboardingStatus;
+    onStatus(next); setPersonSaved(next.peopleCount > 0);
+    return next;
+  }, [onStatus]);
+
+  useEffect(() => {
+    if (status.phoneConnected || (!pairing && !status.pairingPending)) return;
+    const timer = window.setInterval(() => void refresh(), 2500);
+    return () => window.clearInterval(timer);
+  }, [pairing, refresh, status.pairingPending, status.phoneConnected]);
+
+  const startPairing = async (event: React.FormEvent) => {
+    event.preventDefault(); setBusy(true); setError(null);
+    try {
+      const response = await fetch("/api/onboarding/pair", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ phone }) });
+      const result = await response.json() as { code?: string; message?: string; linqNumber?: string; expiresAt?: string; error?: string };
+      if (!response.ok || !result.code || !result.message || !result.linqNumber || !result.expiresAt) throw new Error(result.error ?? "pairing_failed");
+      setPairing(result as { code: string; message: string; linqNumber: string; expiresAt: string });
+      await refresh();
+    } catch (caught) {
+      setError(caught instanceof Error && caught.message === "phone_already_connected" ? "That number is already connected to another Yukti account." : "We couldn't start the connection. Check the number and try again.");
+    } finally { setBusy(false); }
+  };
+
+  const addPerson = async (event: React.FormEvent) => {
+    event.preventDefault(); setBusy(true); setError(null);
+    try {
+      const response = await fetch("/api/onboarding/person", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, relationship }) });
+      if (!response.ok) throw new Error("person_failed");
+      setPersonSaved(true); await refresh();
+    } catch { setError("That person was not saved. Try again."); }
+    finally { setBusy(false); }
+  };
+
+  const connectCalendar = async () => {
+    setBusy(true); setError(null);
+    try {
+      const response = await fetch("/api/onboarding/calendar", { method: "POST" });
+      const result = await response.json() as { redirectUrl?: string };
+      if (!response.ok || !result.redirectUrl) throw new Error("calendar_failed");
+      window.location.assign(result.redirectUrl);
+    } catch { setError("Calendar connection is unavailable right now. You can finish setup and connect it later."); setBusy(false); }
+  };
+
+  const finish = async () => {
+    setBusy(true); setError(null);
+    try {
+      const response = await fetch("/api/onboarding/complete", { method: "POST" });
+      if (!response.ok) throw new Error("complete_failed");
+      await onComplete();
+    } catch { setError("Setup is not complete yet. Check the steps above."); setBusy(false); }
+  };
+
+  const step = !status.phoneConnected ? 1 : !personSaved ? 2 : 3;
+  return <main className="onboarding-shell">
+    <header><Link className="landing-wordmark" href="/">Yukti</Link><div><span>@{user.login}</span><button onClick={() => void onSignOut()}>Sign out</button></div></header>
+    <section className="onboarding-card">
+      <div className="onboarding-progress" aria-label={`Setup step ${step} of 3`}><i className={step >= 1 ? "done" : ""} /><i className={step >= 2 ? "done" : ""} /><i className={step >= 3 ? "done" : ""} /></div>
+      {step === 1 && <div className="onboarding-step"><p className="eyebrow brass">Step 1 of 3</p><h1>Connect your messages</h1><p>Yukti learns only from messages sent to its number. Enter the mobile number you will text from, then send the pairing message exactly as shown.</p>
+        {!pairing ? <form onSubmit={startPairing}><label>Your mobile number<input inputMode="tel" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="+1 604 555 0123" required /></label><button className="primary" disabled={busy}>{busy ? "Preparing…" : status.pairingPending ? "Create a new code" : "Continue"}</button></form>
+          : <div className="pairing-instruction"><span>From {phone || "your phone"}, text</span><strong>{pairing.message}</strong><span>to</span><a href={`sms:${pairing.linqNumber}?body=${encodeURIComponent(pairing.message)}`}>{pairing.linqNumber}</a><small>This code expires in 10 minutes. This page updates after your message arrives.</small></div>}
+      </div>}
+      {step === 2 && <div className="onboarding-step"><p className="eyebrow brass">Step 2 of 3</p><h1>Add someone you care about</h1><p>Start with one person. Yukti will use this relationship only inside your account.</p><form onSubmit={addPerson}><label>Their name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="Alex" maxLength={40} required /></label><label>Your relationship<input value={relationship} onChange={(event) => setRelationship(event.target.value)} placeholder="Friend" maxLength={40} required /></label><button className="primary" disabled={busy}>{busy ? "Saving…" : "Save and continue"}</button></form></div>}
+      {step === 3 && <div className="onboarding-step"><p className="eyebrow brass">Step 3 of 3</p><h1>Bring in important dates</h1><p>Connect Google Calendar so Yukti can prepare for birthdays and plans already on your schedule. You can also add reminders manually.</p><div className="calendar-choice">{status.calendarConnected ? <p className="connected-note">Google Calendar is connected.</p> : <button className="secondary wide" onClick={connectCalendar} disabled={busy}>{busy ? "Opening Google…" : "Connect Google Calendar"}</button>}<button className="primary wide" onClick={finish} disabled={busy}>{status.calendarConnected ? "Finish setup" : "Finish without calendar"}</button></div></div>}
+      {error && <p className="form-error" role="alert">{error}</p>}
+    </section>
+  </main>;
+}
+
+function MemberToday({ snapshot, busy, approved, approvedProduct, approvalId, sandboxSession, sandboxOutcome, paymentBusy, paymentError, onPeople, onApproveProduct, onStartPrava, onVerifyPrava, onCancelPrava }: { snapshot: ConciergeSnapshot | null; busy: boolean; approved: boolean; approvedProduct: { personName?: string | null; merchant: string; title: string; price: number; currency: string } | null; approvalId: string | null; sandboxSession: SandboxSession | null; sandboxOutcome: SandboxOutcome | null; paymentBusy: boolean; paymentError: string | null; onPeople: () => void; onApproveProduct: (product: ConciergeSnapshot["products"][number]) => Promise<void>; onStartPrava: () => Promise<void>; onVerifyPrava: () => Promise<void>; onCancelPrava: () => Promise<void> }) {
+  if (busy && !snapshot) return <section className="member-today"><p className="page-note">Loading your day…</p></section>;
+  const latest = snapshot?.products[0];
+  const nextRule = snapshot?.rules.find((rule) => Boolean(rule.enabled));
+  return <section className="member-today"><div className="member-today-head"><p className="eyebrow brass">Today</p><h1>{approvedProduct ? "Ready for checkout" : latest ? "One gift is ready to review" : "Nothing needs your approval"}</h1><p>{approvedProduct ? "Check the exact item and amount before opening checkout." : latest ? "Yukti found a current option from your saved reminder." : nextRule ? `Your next ${nextRule.kind} reminder is scheduled for ${new Date(nextRule.nextEligibleAt).toLocaleDateString()}.` : "Add a reminder and Yukti will prepare an option when it is due."}</p></div>
+    {!nextRule && !latest && <div className="today-empty"><div className="large-mark">01</div><h2>Set your first reminder</h2><p>Choose a person, a cadence, and the most Yukti should consider.</p><button className="primary" onClick={onPeople}>Open People</button></div>}
+    {latest && !approvedProduct && <div className="today-product"><LiveProductCard product={latest} busy={busy} onApprove={onApproveProduct} /></div>}
+    {approvedProduct && <section className="approval-envelope member-approval"><div className="fold" aria-hidden="true" /><div><span className="eyebrow">Purchase approval</span><h3>{approvedProduct.title}</h3><p>{approvedProduct.merchant} · {money(approvedProduct.price, approvedProduct.currency)}</p></div><dl><div><dt>For</dt><dd>{approvedProduct.personName || "Your reminder"}</dd></div><div><dt>Expires</dt><dd>In 15 minutes</dd></div><div><dt>Status</dt><dd>{approved ? "Approved" : "Needs approval"}</dd></div></dl>{approvalId && !sandboxSession && <button className="primary" onClick={() => void onStartPrava()} disabled={paymentBusy}>{paymentBusy ? "Opening checkout…" : "Continue to secure checkout"}</button>}{sandboxSession && <div className="sandbox-actions"><a className="primary" href={sandboxSession.checkoutUrl} target="_blank" rel="noreferrer">Open secure checkout</a><button onClick={() => void onVerifyPrava()} disabled={paymentBusy}>Check result</button><button onClick={() => void onCancelPrava()} disabled={paymentBusy}>Cancel session</button></div>}{sandboxOutcome?.state === "pending" && <p className="microcopy">Checkout is still waiting for verification.</p>}{paymentError && <p className="form-error" role="alert">{paymentError}</p>}<p className="microcopy">This approval can be used only once for this merchant, item, and amount.</p></section>}
+  </section>;
+}
+
 function EmptyEvent({ eventId }: { eventId: string }) {
   const passport = eventId === "evt-passport";
   return <div className="empty-event"><span className="large-mark">{passport ? "12" : "15"}</span><div className="eyebrow brass">{passport ? "Needs one answer" : "Watching"}</div><h2>{passport ? "Passport renewal needs your travel date." : "Nothing to do yet."}</h2><p>{passport ? "Yukti can prepare the renewal checklist after you confirm whether international travel is booked in the next six months." : "Yukti will remind you if anything needs your attention before the appointment."}</p><p className="page-note">{passport ? "Add your travel details whenever you are ready." : "No action is needed yet."}</p></div>;
@@ -346,18 +476,24 @@ function EmptyEvent({ eventId }: { eventId: string }) {
 function SecondaryView({ view, providerStatus, statusBusy, statusError, authenticated, onCheckProviders, concierge, conciergeBusy, conciergeError, onReloadConcierge, onUpdateConcierge, onScanFlowers, onApproveProduct }: { view: Exclude<View, "Today">; providerStatus: ProviderStatus | null; statusBusy: boolean; statusError: string | null; authenticated: boolean; onCheckProviders: () => void; concierge: ConciergeSnapshot | null; conciergeBusy: boolean; conciergeError: string | null; onReloadConcierge: () => Promise<void>; onUpdateConcierge: (path: string, body: Record<string, unknown>) => Promise<unknown>; onScanFlowers: (send: boolean) => Promise<void>; onApproveProduct: (product: ConciergeSnapshot["products"][number]) => Promise<void> }) {
   if (view === "People") return <PeopleView snapshot={concierge} busy={conciergeBusy} error={conciergeError} authenticated={authenticated} onReload={onReloadConcierge} onUpdate={onUpdateConcierge} onScan={onScanFlowers} onApproveProduct={onApproveProduct} />;
   if (view === "Wallet") return <section className="secondary-page"><h1>Wallet</h1><div className="ledger-zero"><strong>$0.00</strong><span>spent through Yukti</span></div><p className="page-note">Payment details are requested in checkout, after you approve a specific purchase.</p></section>;
-  return <section className="secondary-page"><h1>Activity</h1><div className="connection-check"><div><strong>Connections</strong><p>Check messaging, memory, product search, calendar, and checkout. This will not send a message or open checkout.</p></div><button className="secondary" onClick={onCheckProviders} disabled={statusBusy || !authenticated}>{statusBusy ? "Checking…" : authenticated ? "Check connections" : "Sign in to check"}</button></div>{statusError && <p className="inline-error" role="alert">{statusError}</p>}{providerStatus && <div className="provider-grid" aria-live="polite">{Object.entries(providerStatus.providers).map(([name, status]) => <div key={name}><span>{providerLabel(name)}</span><strong>{connectionLabel(status.state)}</strong>{status.detail && status.detail.toLowerCase() !== status.state.toLowerCase() && status.detail.toLowerCase() !== "healthy" && <small>{status.detail}</small>}</div>)}</div>}<div className="audit-list">{seedAudit.map((item) => <div key={item.time + item.title}><time>{item.time}</time><span><strong>{item.title}</strong><small>{item.detail}</small></span></div>)}</div></section>;
+  const connectCalendar = async () => {
+    const response = await fetch("/api/onboarding/calendar", { method: "POST" });
+    const result = await response.json() as { redirectUrl?: string };
+    if (response.ok && result.redirectUrl) window.location.assign(result.redirectUrl);
+  };
+  return <section className="secondary-page"><h1>Activity</h1><div className="connection-check"><div><strong>Connections</strong><p>Check messaging, memory, product search, calendar, and checkout. This will not send a message or open checkout.</p></div><button className="secondary" onClick={onCheckProviders} disabled={statusBusy || !authenticated}>{statusBusy ? "Checking…" : "Check connections"}</button></div>{statusError && <p className="inline-error" role="alert">{statusError}</p>}{providerStatus && <div className="provider-grid" aria-live="polite">{Object.entries(providerStatus.providers).map(([name, status]) => <div key={name}><span>{providerLabel(name)}</span><strong>{connectionLabel(status.state)}</strong>{name === "composio" && status.state !== "connected" && <button onClick={() => void connectCalendar()}>Connect calendar</button>}{status.detail && status.detail.toLowerCase() !== status.state.toLowerCase() && status.detail.toLowerCase() !== "healthy" && <small>{status.detail}</small>}</div>)}</div>}<div className="audit-list">{concierge?.activity.map((item) => <div key={`${item.createdAt}-${item.kind}`}><time>{new Date(item.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</time><span><strong>{activityLabel(item.kind)}</strong><small>{activityDetail(item.kind, item.detail)}</small></span></div>)}{!concierge?.activity.length && <p className="page-note">Your approvals, memory changes, and checkout results will appear here.</p>}</div></section>;
 }
 
 function PeopleView({ snapshot, busy, error, authenticated, onReload, onUpdate, onScan, onApproveProduct }: { snapshot: ConciergeSnapshot | null; busy: boolean; error: string | null; authenticated: boolean; onReload: () => Promise<void>; onUpdate: (path: string, body: Record<string, unknown>) => Promise<unknown>; onScan: (send: boolean) => Promise<void>; onApproveProduct: (product: ConciergeSnapshot["products"][number]) => Promise<void> }) {
-  const [personName, setPersonName] = useState("Sarah");
+  const [personName, setPersonName] = useState("");
   const [kind, setKind] = useState("preference");
   const [value, setValue] = useState("");
   const [cadence, setCadence] = useState(28);
   const [budget, setBudget] = useState(75);
   const connected = snapshot?.mode === "connected";
-  const addFact = async (event: React.FormEvent) => { event.preventDefault(); await onUpdate("/api/concierge/facts", { personName, kind, value }); setValue(""); };
-  const addRule = async (event: React.FormEvent) => { event.preventDefault(); await onUpdate("/api/concierge/rules", { personName, cadenceDays: cadence, maximumAmountMinor: budget * 100 }); };
+  const activePersonName = personName || snapshot?.people[0]?.name || "";
+  const addFact = async (event: React.FormEvent) => { event.preventDefault(); await onUpdate("/api/concierge/facts", { personName: activePersonName, kind, value }); setValue(""); };
+  const addRule = async (event: React.FormEvent) => { event.preventDefault(); await onUpdate("/api/concierge/rules", { personName: activePersonName, cadenceDays: cadence, maximumAmountMinor: budget * 100 }); };
 
   return <section className="secondary-page people-page">
     <div className="people-heading"><div><h1>People</h1></div><p>Review what Yukti remembers and where each detail came from.</p></div>
@@ -366,17 +502,17 @@ function PeopleView({ snapshot, busy, error, authenticated, onReload, onUpdate, 
     {busy && !snapshot && <p className="page-note" role="status">Loading people...</p>}
     {snapshot && <div className="relationship-ledger">
       <aside className="people-rail" aria-label="People in memory">
-        {snapshot.people.map((person) => <button type="button" key={person.id} onClick={() => setPersonName(person.name)} className={personName.toLowerCase() === person.name.toLowerCase() ? "active-person" : ""}><span>{person.name.slice(0, 1)}</span><strong>{person.name}</strong><small>{person.relationship}</small></button>)}
+        {snapshot.people.map((person) => <button type="button" key={person.id} onClick={() => setPersonName(person.name)} className={activePersonName.toLowerCase() === person.name.toLowerCase() ? "active-person" : ""}><span>{person.name.slice(0, 1)}</span><strong>{person.name}</strong><small>{person.relationship}</small></button>)}
         {!snapshot.people.length && <p>No one saved yet. Add the first fact or text Yukti.</p>}
       </aside>
       <div className="memory-sheet">
-        <div className="memory-sheet-head"><div><h2>{personName}</h2></div><button className="secondary" onClick={() => void onReload()} disabled={busy}>Refresh</button></div>
+        <div className="memory-sheet-head"><div><h2>{activePersonName}</h2></div><button className="secondary" onClick={() => void onReload()} disabled={busy}>Refresh</button></div>
         <div className="fact-list">
-          {snapshot.facts.filter((fact) => snapshot.people.find((person) => person.id === fact.personId)?.name.toLowerCase() === personName.toLowerCase()).map((fact) => <MemoryFactRow key={fact.id} fact={fact} editable={connected} busy={busy} onUpdate={onUpdate} />)}
-          {!snapshot.facts.length && <p className="memory-empty">Text Yukti something like &quot;Sarah loves tulips&quot; or add a fact below.</p>}
+          {snapshot.facts.filter((fact) => snapshot.people.find((person) => person.id === fact.personId)?.name.toLowerCase() === activePersonName.toLowerCase()).map((fact) => <MemoryFactRow key={fact.id} fact={fact} editable={connected} busy={busy} onUpdate={onUpdate} />)}
+          {!snapshot.facts.length && <p className="memory-empty">Text Yukti what this person likes, or add a fact below.</p>}
         </div>
         {connected && <form className="memory-form" onSubmit={addFact}>
-          <label>Person<input value={personName} onChange={(event) => setPersonName(event.target.value)} maxLength={40} required /></label>
+          <label>Person<input value={activePersonName} onChange={(event) => setPersonName(event.target.value)} maxLength={40} required /></label>
           <label>Fact type<select value={kind} onChange={(event) => setKind(event.target.value)}><option value="preference">Preference</option><option value="relationship">Relationship</option><option value="budget">Budget</option><option value="location">Delivery location</option><option value="note">Note</option></select></label>
           <label className="fact-value">What should Yukti remember?<input value={value} onChange={(event) => setValue(event.target.value)} placeholder="Loves tulips" maxLength={120} required /></label>
           <button className="primary" disabled={busy}>Save fact</button>
@@ -386,7 +522,7 @@ function PeopleView({ snapshot, busy, error, authenticated, onReload, onUpdate, 
 
     {connected && <section className="proactive-workbench">
       <div className="cadence-copy"><h2>Flower reminder</h2><p>When it is due, Yukti finds a current option and asks before any purchase.</p></div>
-      <form onSubmit={addRule} className="cadence-form"><label>Person<input value={personName} onChange={(event) => setPersonName(event.target.value)} required /></label><label>Every<span><input type="number" min="7" max="365" value={cadence} onChange={(event) => setCadence(Number(event.target.value))} /> days</span></label><label>Stay under<span><input type="number" min="10" max="1000" value={budget} onChange={(event) => setBudget(Number(event.target.value))} /> USD</span></label><button className="secondary" disabled={busy}>Save reminder</button></form>
+      <form onSubmit={addRule} className="cadence-form"><label>Person<input value={activePersonName} onChange={(event) => setPersonName(event.target.value)} required /></label><label>Every<span><input type="number" min="7" max="365" value={cadence} onChange={(event) => setCadence(Number(event.target.value))} /> days</span></label><label>Stay under<span><input type="number" min="10" max="1000" value={budget} onChange={(event) => setBudget(Number(event.target.value))} /> USD</span></label><button className="secondary" disabled={busy}>Save reminder</button></form>
       <div className="rule-list">{snapshot?.rules.map((rule) => <div key={rule.id}><div><strong>{rule.personName}: flowers every {rule.cadenceDays} days</strong><small>Up to {money(rule.maximumAmountMinor, rule.currency)}. Next scan {new Date(rule.nextEligibleAt).toLocaleDateString()}.</small></div><button onClick={() => void onUpdate("/api/concierge/rules/toggle", { id: rule.id, enabled: !Boolean(rule.enabled) })} disabled={busy}>{rule.enabled ? "Pause" : "Resume"}</button></div>)}</div>
       <div className="scan-actions"><button className="primary" onClick={() => void onScan(false)} disabled={busy || !snapshot?.rules.length}>{busy ? "Checking..." : "Find a flower option"}</button><button className="send-action" onClick={() => void onScan(true)} disabled={busy || !snapshot?.rules.length}>Find and text me</button></div>
       <div className="real-products">{snapshot?.products.map((product) => <LiveProductCard key={product.id} product={product} busy={busy} onApprove={onApproveProduct} />)}</div>
@@ -398,7 +534,7 @@ function PeopleView({ snapshot, busy, error, authenticated, onReload, onUpdate, 
 
 function LiveProductCard({ product, busy, onApprove }: { product: ConciergeSnapshot["products"][number]; busy: boolean; onApprove: (product: ConciergeSnapshot["products"][number]) => Promise<void> }) {
   const evidence = parseProductEvidence(product.evidence);
-  return <article>{product.imageUrl && <img src={product.imageUrl} alt="" />}<div><span>{product.merchant} · checked {new Date(product.retrievedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span><h3>{product.title}</h3><strong>From {money(product.amountMinor, product.currency)}</strong><p>{product.availability}</p>{evidence && <div className="grounding-note"><small>Current merchant page checked for {evidence.location}. The merchant confirms the exact address and delivery date.</small>{evidence.citations.map((citation) => <a key={citation.url} href={citation.url} target="_blank" rel="noreferrer">{citation.title}</a>)}</div>}<div className="product-actions"><button onClick={() => void onApprove(product)} disabled={busy}>Approve this option</button><a href={product.url} target="_blank" rel="noreferrer">View merchant page</a></div></div></article>;
+  return <article>{product.imageUrl && <Image src={product.imageUrl} alt="" width={130} height={150} unoptimized />}<div><span>{product.merchant} · checked {new Date(product.retrievedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span><h3>{product.title}</h3><strong>From {money(product.amountMinor, product.currency)}</strong><p>{product.availability}</p>{evidence && <div className="grounding-note"><small>Current merchant page checked for {evidence.location}. The merchant confirms the exact address and delivery date.</small>{evidence.citations.map((citation) => <a key={citation.url} href={citation.url} target="_blank" rel="noreferrer">{citation.title}</a>)}</div>}<div className="product-actions"><button onClick={() => void onApprove(product)} disabled={busy}>Approve this option</button><a href={product.url} target="_blank" rel="noreferrer">View merchant page</a></div></div></article>;
 }
 
 function parseProductEvidence(raw: string) {
@@ -407,6 +543,30 @@ function parseProductEvidence(raw: string) {
     const citations = value.groundedResearch?.citations?.filter((item) => /^https:\/\//.test(item.url)).slice(0, 3) ?? [];
     return value.deliveryLocation && citations.length ? { location: value.deliveryLocation, citations, toolUsed: value.groundedResearch?.toolUsed ?? "google_search" } : null;
   } catch { return null; }
+}
+
+function activityLabel(kind: string) {
+  return ({
+    "approval.created": "Purchase approved",
+    "memory.deleted": "Memory removed",
+    "preparation.generated": "Gift options refreshed",
+    "payment.sandbox_result": "Checkout result received",
+    "linq.reply_failed": "Message reply delayed",
+    "onboarding.completed": "Account setup completed",
+  } as Record<string, string>)[kind] ?? "Account updated";
+}
+
+function activityDetail(kind: string, raw: string) {
+  try {
+    const detail = JSON.parse(raw) as { amountMinor?: number; currency?: string; state?: string };
+    if (kind === "approval.created" && detail.amountMinor && detail.currency) return `${money(detail.amountMinor, detail.currency)} approved for one checkout.`;
+    if (kind === "payment.sandbox_result") return detail.state ? `Checkout returned ${detail.state.replace(/_/g, " ")}.` : "Checkout returned a result.";
+  } catch { /* Older activity may not contain structured details. */ }
+  return kind === "memory.deleted" ? "A saved detail was deleted."
+    : kind === "preparation.generated" ? "Yukti checked your saved context again."
+    : kind === "linq.reply_failed" ? "Your message was saved, but the reply could not be sent."
+    : kind === "onboarding.completed" ? "Messages and your first person are ready."
+    : "Your account changed.";
 }
 
 function MemoryFactRow({ fact, editable, busy, onUpdate }: { fact: ConciergeSnapshot["facts"][number]; editable: boolean; busy: boolean; onUpdate: (path: string, body: Record<string, unknown>) => Promise<unknown> }) {

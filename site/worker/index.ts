@@ -18,6 +18,7 @@ interface Env {
   LINQ_WEBHOOK_SECRET?: string;
   YUKTI_OWNER_GITHUB_LOGIN?: string;
   COMPOSIO_API_KEY?: string;
+  COMPOSIO_GOOGLE_CALENDAR_AUTH_CONFIG_ID?: string;
   COMPOSIO_USER_ID?: string;
   GITHUB_CLIENT_ID?: string;
   GITHUB_CLIENT_SECRET?: string;

@@ -9,6 +9,7 @@ const serverEnvSchema = z.object({
   YUKTI_DEMO_USER_EMAIL: z.string().email().optional(),
   PRAVA_SECRET_KEY: z.string().startsWith("sk_test_").optional(),
   COMPOSIO_API_KEY: z.string().min(1).optional(),
+  COMPOSIO_GOOGLE_CALENDAR_AUTH_CONFIG_ID: z.string().regex(/^ac_[A-Za-z0-9_-]+$/).optional(),
   SENSO_API_KEY: z.string().min(1).optional(),
   LINQ_API_TOKEN: z.string().min(1).optional(),
   LINQ_PHONE_NUMBER: z.string().regex(/^\+[1-9]\d{7,14}$/).optional(),

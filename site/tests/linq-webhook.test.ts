@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isAllowedLinqEvent, linqInboundEvent, verifyLinqWebhook } from "../providers/linq/webhook";
+import { isAllowedLinqEvent, isAllowedLinqLineEvent, linqInboundEvent, verifyLinqWebhook } from "../providers/linq/webhook";
 
 describe("Linq webhook boundary", () => {
   it("verifies the raw body and rejects stale or changed deliveries", async () => {
@@ -20,6 +20,7 @@ describe("Linq webhook boundary", () => {
     } });
     expect(event.data.parts[0]).toMatchObject({ type: "text", value: "Sarah likes tulips" });
     expect(isAllowedLinqEvent(event, "+12134989364", "+17782316707")).toBe(true);
+    expect(isAllowedLinqLineEvent(event, "+12134989364")).toBe(true);
     expect(isAllowedLinqEvent(event, "+12134989364", "+15555550100")).toBe(false);
     expect(isAllowedLinqEvent({ ...event, data: { ...event.data, chat: { ...event.data.chat, is_group: true } } }, "+12134989364", "+17782316707")).toBe(false);
   });

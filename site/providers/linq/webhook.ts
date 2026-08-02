@@ -11,9 +11,13 @@ export const linqInboundEvent = z.object({
 });
 export type LinqInboundEvent = z.infer<typeof linqInboundEvent>;
 
-export function isAllowedLinqEvent(event: LinqInboundEvent, ownerLine: string, ownerRecipient: string) {
+export function isAllowedLinqLineEvent(event: LinqInboundEvent, ownerLine: string) {
   return !event.data.chat.is_group && event.data.chat.owner_handle.is_me && event.data.chat.owner_handle.handle === ownerLine &&
-    !event.data.sender_handle.is_me && event.data.sender_handle.handle === ownerRecipient;
+    !event.data.sender_handle.is_me && /^\+[1-9]\d{7,14}$/.test(event.data.sender_handle.handle);
+}
+
+export function isAllowedLinqEvent(event: LinqInboundEvent, ownerLine: string, ownerRecipient: string) {
+  return isAllowedLinqLineEvent(event, ownerLine) && event.data.sender_handle.handle === ownerRecipient;
 }
 
 export async function verifyLinqWebhook(secret: string, rawBody: string, headers: Headers, nowSeconds = Math.floor(Date.now() / 1000)) {

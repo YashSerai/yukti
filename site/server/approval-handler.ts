@@ -8,6 +8,8 @@ import { identityFromRequest } from "./identity";
 import { beginGitHubLogin, finishGitHubLogin, logoutGitHub, sha256 } from "./github-auth";
 import { consumeRateLimit, guardProviderUse, RateLimitError, requireSameOrigin } from "./rate-limit";
 import { handleConciergeRequest, handleLinqWebhook } from "./concierge-handler";
+import { handleOnboardingRequest, onboardingStatus } from "./onboarding-handler";
+import type { RequestIdentity } from "./identity";
 
 type RuntimeEnv = {
   DB: D1Database;
@@ -24,6 +26,7 @@ type RuntimeEnv = {
   YUKTI_OWNER_GITHUB_LOGIN?: string;
   COMPOSIO_API_KEY?: string;
   COMPOSIO_USER_ID?: string;
+  COMPOSIO_GOOGLE_CALENDAR_AUTH_CONFIG_ID?: string;
   GITHUB_CLIENT_ID?: string;
   GITHUB_CLIENT_SECRET?: string;
   GITHUB_CALLBACK_URL?: string;
@@ -69,7 +72,10 @@ export async function handleYuktiApi(request: Request, env: RuntimeEnv): Promise
     if (url.pathname === "/api/auth/github/callback" && request.method === "GET") return finishGitHubLogin(request, env);
     if (url.pathname === "/api/me" && request.method === "GET") {
       const identity = await identityFromRequest(request, env.DB, env.YUKTI_MODE);
-      return identity ? reply({ user: { login: identity.login, displayName: identity.displayName } }, 200) : reply({ error: "authentication_required" }, 401);
+      if (!identity) return reply({ error: "authentication_required" }, 401);
+      await ensureIdentityUser(env.DB, identity);
+      if (isOwner(identity, env)) await seedOwnerDemoData(env.DB, identity, env.LINQ_OWNER_PHONE);
+      return reply({ user: { login: identity.login, displayName: identity.displayName }, onboarding: await onboardingStatus(env, identity) }, 200);
     }
     if (url.pathname === "/api/webhooks/linq" && request.method === "POST") return handleLinqWebhook(request, env);
     if (request.method !== "POST" && request.method !== "GET") return reply({ error: "method_not_allowed" }, 405);
@@ -81,12 +87,15 @@ export async function handleYuktiApi(request: Request, env: RuntimeEnv): Promise
 
     const identity = await identityFromRequest(request, env.DB, env.YUKTI_MODE);
     if (!identity) return reply({ error: "authentication_required" }, 401);
+    await ensureIdentityUser(env.DB, identity);
+    const onboardingResponse = await handleOnboardingRequest(request, env, identity);
+    if (onboardingResponse) return onboardingResponse;
     const conciergeResponse = await handleConciergeRequest(request, env, identity);
     if (conciergeResponse) return conciergeResponse;
     if (request.method !== "POST") return reply({ error: "not_found" }, 404);
     if (url.pathname === "/api/approvals") {
       await consumeRateLimit(env.DB, "approval", identity.id, 20, 60 * 60_000);
-      return createApproval(request, env.DB, identity);
+      return createApproval(request, env, identity);
     }
     if (url.pathname === "/api/prepare") {
       await guardProviderUse(env.DB, "prepare", identity.id);
@@ -95,7 +104,7 @@ export async function handleYuktiApi(request: Request, env: RuntimeEnv): Promise
     if (url.pathname === "/api/status") {
       await consumeRateLimit(env.DB, "status", identity.id, 6, 10 * 60_000);
       await consumeRateLimit(env.DB, "status:global", "all", 60, 10 * 60_000);
-      return providerStatus(env);
+      return providerStatus(env, identity);
     }
     if (url.pathname === "/api/prava/sessions") {
       await guardProviderUse(env.DB, "prava", identity.id);
@@ -116,12 +125,12 @@ export async function handleYuktiApi(request: Request, env: RuntimeEnv): Promise
   }
 }
 
-async function providerStatus(env: RuntimeEnv) {
+async function providerStatus(env: RuntimeEnv, identity: RequestIdentity) {
   const linq = env.LINQ_API_TOKEN && env.LINQ_PHONE_NUMBER
     ? await safeCheck(() => new LinqClient(env.LINQ_API_TOKEN!, env.LINQ_PHONE_NUMBER!).health())
     : { ok: false as const, reason: "not_configured" };
   const composio = env.COMPOSIO_API_KEY
-    ? await safeCheck(() => new ComposioClient(env.COMPOSIO_API_KEY!).calendarConnection(env.COMPOSIO_USER_ID ?? "yukti-owner"))
+    ? await safeCheck(() => new ComposioClient(env.COMPOSIO_API_KEY!).calendarConnection(composioUserId(env, identity)))
     : { ok: false as const, reason: "not_configured" };
 
   return reply({
@@ -141,10 +150,11 @@ async function safeCheck<T>(check: () => Promise<T>): Promise<{ ok: true; value:
   catch { return { ok: false, reason: "provider_unavailable" }; }
 }
 
-async function prepareWithGemini(env: RuntimeEnv, identity: { id: string; displayName: string }) {
+async function prepareWithGemini(env: RuntimeEnv, identity: RequestIdentity) {
+  if (!isOwner(identity, env)) return reply({ error: "owner_demo_only" }, 403);
   if (!env.GEMINI_API_KEY) return reply({ error: "gemini_not_configured" }, 503);
   if (!env.SENSO_API_KEY) return reply({ error: "senso_not_configured" }, 503);
-  await seedJudgeData(env.DB, identity);
+  await seedOwnerDemoData(env.DB, identity, env.LINQ_OWNER_PHONE);
   try {
     const memories = await new SensoClient(env.SENSO_API_KEY).searchMemory("What gift preferences and activities are known about Sarah?");
     if (memories.length === 0) return reply({ error: "senso_memory_not_found" }, 404);
@@ -160,9 +170,10 @@ async function prepareWithGemini(env: RuntimeEnv, identity: { id: string; displa
   }
 }
 
-async function createApproval(request: Request, db: D1Database, identity: { id: string; displayName: string }) {
+async function createApproval(request: Request, env: RuntimeEnv, identity: RequestIdentity) {
+  const db = env.DB;
   const body = await readBody(request);
-  await seedJudgeData(db, identity);
+  if (isOwner(identity, env)) await seedOwnerDemoData(db, identity, env.LINQ_OWNER_PHONE);
   let candidateSlug = typeof body?.candidateId === "string" ? body.candidateId : "";
   let candidateId: string;
   const productSnapshotId = typeof body?.productSnapshotId === "string" ? body.productSnapshotId : "";
@@ -194,6 +205,7 @@ async function createApproval(request: Request, db: D1Database, identity: { id: 
     await db.prepare(`INSERT OR IGNORE INTO candidates (id, plan_id, merchant, title, amount_minor, currency, url, evidence, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(candidateId, livePlanId, snapshot.merchant, snapshot.title, snapshot.amount_minor, snapshot.currency, snapshot.url, snapshot.evidence, now, now).run();
   } else {
+    if (!isOwner(identity, env)) return reply({ error: "product_snapshot_required" }, 400);
     if (!/^cand-(tea|book)$/.test(candidateSlug)) return reply({ error: "unknown_candidate" }, 400);
     candidateId = scoped(identity.id, candidateSlug);
   }
@@ -352,7 +364,7 @@ async function verifyPravaSession(request: Request, env: RuntimeEnv, userId: str
   }
 }
 
-async function seedJudgeData(db: D1Database, identity: { id: string; displayName: string }) {
+async function seedOwnerDemoData(db: D1Database, identity: { id: string; displayName: string }, ownerPhone?: string) {
   const now = new Date().toISOString();
   const eventId = scoped(identity.id, "evt-sarah");
   const personId = scoped(identity.id, "person-sarah");
@@ -365,7 +377,23 @@ async function seedJudgeData(db: D1Database, identity: { id: string; displayName
     ["INSERT OR IGNORE INTO candidates (id, plan_id, merchant, title, amount_minor, currency, url, evidence, created_at, updated_at) VALUES (?, ?, 'Granville Tea Co.', 'Jasmine tea tasting set', 4200, 'CAD', 'https://example.com/yukti-sandbox/tea', 'Saved relationship memory', ?, ?)", [scoped(identity.id, "cand-tea"), planId, now, now]],
     ["INSERT OR IGNORE INTO candidates (id, plan_id, merchant, title, amount_minor, currency, url, evidence, created_at, updated_at) VALUES (?, ?, 'Paper Hound', 'The Art of Still Life', 3800, 'CAD', 'https://example.com/yukti-sandbox/book', 'Saved relationship memory', ?, ?)", [scoped(identity.id, "cand-book"), planId, now, now]],
   ];
+  rows.push(["UPDATE users SET onboarding_completed_at = COALESCE(onboarding_completed_at, ?), updated_at = ? WHERE id = ?", [now, now, identity.id]]);
+  if (ownerPhone) rows.push(["INSERT OR IGNORE INTO concierge_profiles (user_id, phone_e164, proactive_enabled, quiet_start_hour, quiet_end_hour, created_at, updated_at) VALUES (?, ?, 1, 21, 8, ?, ?)", [identity.id, ownerPhone, now, now]]);
   await db.batch(rows.map(([sql, values]) => db.prepare(sql).bind(...values)));
+}
+
+function isOwner(identity: { login?: string }, env: RuntimeEnv) {
+  return identity.login?.toLowerCase() === (env.YUKTI_OWNER_GITHUB_LOGIN ?? "YashSerai").toLowerCase();
+}
+
+function composioUserId(env: RuntimeEnv, identity: RequestIdentity) {
+  return isOwner(identity, env) ? env.COMPOSIO_USER_ID ?? "yukti-owner" : `yukti-${identity.id}`;
+}
+
+async function ensureIdentityUser(db: D1Database, identity: RequestIdentity) {
+  const now = new Date().toISOString();
+  await db.prepare("INSERT OR IGNORE INTO users (id, chatgpt_user_id, display_name, timezone, onboarding_completed_at, created_at, updated_at) VALUES (?, ?, ?, 'America/Vancouver', NULL, ?, ?)")
+    .bind(identity.id, identity.id, identity.displayName, now, now).run();
 }
 
 function scoped(userId: string, id: string) {
