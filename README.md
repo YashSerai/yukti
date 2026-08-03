@@ -2,6 +2,8 @@
 
 Yukti is a personal gifting concierge built for the Agentic Commerce Hackathon. It remembers who people are and what they like, imports upcoming Google Calendar events, finds a current gift option, and asks for approval before opening checkout.
 
+Try the product: <https://yukti.yashns.chatgpt.site>
+
 The demo follows one simple path: tell Yukti that Sarah is your girlfriend, save her preferences and budget, let Yukti find a current bouquet, then approve the exact merchant, item, amount, and time window.
 
 ## How it works
